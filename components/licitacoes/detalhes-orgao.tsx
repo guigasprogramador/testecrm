@@ -8,7 +8,7 @@ import { Badge } from "@/components/ui/badge"
 import { Label } from "@/components/ui/label"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
-import { Phone, Mail, User, PlusCircle, Edit, Save, Trash2, ChevronRight, Landmark, AlertTriangle } from "lucide-react"
+import { Phone, Mail, User, PlusCircle, Edit, Save, Trash2, ChevronRight, Landmark, AlertTriangle, Maximize2, Minimize2 } from "lucide-react"
 import { Card, CardContent } from "@/components/ui/card"
 import { toast } from "sonner"
 import {
@@ -90,6 +90,7 @@ export function DetalhesOrgao({ orgao, open, onOpenChange, onOrgaoUpdate, onOrga
   const [mostrarFormContato, setMostrarFormContato] = useState(false)
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const [editingContato, setEditingContato] = useState<string | null>(null)
+  const [isExpanded, setIsExpanded] = useState(false)
 
   // Reset active tab when opening the sheet
   useEffect(() => {
@@ -283,49 +284,44 @@ export function DetalhesOrgao({ orgao, open, onOpenChange, onOrgaoUpdate, onOrga
       </AlertDialog>
 
       <Sheet key={`orgao-sheet-${orgao?.id || "empty"}`} open={open} onOpenChange={onOpenChange}>
-        <SheetContent className="w-full md:max-w-xl lg:max-w-2xl overflow-y-auto">
+        <SheetContent 
+          className={`overflow-y-auto transition-all duration-300 ${
+            isExpanded ? "w-[95vw] max-w-[95vw]" : "w-full md:max-w-3xl lg:max-w-4xl"
+          }`}
+        >
           <SheetHeader className="mb-6">
-            <SheetTitle className="text-xl flex items-center gap-2">
-              <Landmark className="h-5 w-5 text-primary" />
-              {isEditing ? (
-                <Input 
-                  value={formData.nome || ""} 
-                  onChange={(e) => handleFieldChange("nome", e.target.value)}
-                  className="font-bold text-xl h-8 mt-0 p-0 border-0 focus-visible:ring-0 focus-visible:ring-offset-0"
-                />
-              ) : (
-                formData.nome || "Órgão"
-              )}
-            </SheetTitle>
-            <div>
-              <Badge variant="outline" className="mt-2">
-                {formData.tipoLabel || "Órgão Público"}
-              </Badge>
-            </div>
-            <div className="flex justify-between mt-4">
-              <div className="flex gap-2">
-                {isEditing && (
-                  <Button 
-                    onClick={() => setDeleteDialogOpen(true)} 
-                    variant="destructive" 
-                    size="sm"
-                    className="gap-2"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                    Excluir
-                  </Button>
-                )}
-              </div>
-              <div>
+            <div className="flex justify-between items-center">
+              <SheetTitle className="text-xl flex items-center gap-2">
+                <Landmark className="h-5 w-5 text-primary" />
                 {isEditing ? (
-                  <Button onClick={handleSave} className="gap-2">
-                    <Save className="w-4 h-4" />
-                    Salvar Alterações
-                  </Button>
+                  <Input 
+                    value={formData.nome || ""} 
+                    onChange={(e) => handleFieldChange("nome", e.target.value)}
+                    className="h-7 text-xl font-semibold"
+                  />
                 ) : (
-                  <Button onClick={() => setIsEditing(true)} variant="outline" className="gap-2">
+                  formData.nome || "Órgão"
+                )}
+              </SheetTitle>
+              <div className="flex gap-2">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => setIsExpanded(!isExpanded)}
+                  className="h-8 w-8 rounded-full"
+                  title={isExpanded ? "Recolher painel" : "Expandir painel"}
+                >
+                  {isExpanded ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
+                </Button>
+                {!isEditing ? (
+                  <Button variant="outline" size="sm" onClick={() => setIsEditing(true)} className="gap-2">
                     <Edit className="w-4 h-4" />
                     Editar
+                  </Button>
+                ) : (
+                  <Button onClick={handleSave} variant="outline" size="sm" className="gap-2">
+                    <Save className="w-4 h-4" />
+                    Salvar
                   </Button>
                 )}
               </div>

@@ -246,11 +246,11 @@ export default function DocumentosPage() {
   }
 
   return (
-    <div className="p-6">
+    <div className="p-4 md:p-6 overflow-hidden">
       <h1 className="text-2xl font-bold mb-6">Documentos</h1>
 
       {/* Cards de estatísticas */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
         <Card>
           <CardContent className="p-6">
             <div className="text-3xl font-bold">{totalDocumentos}</div>
@@ -267,38 +267,38 @@ export default function DocumentosPage() {
       </div>
 
       {/* Filtros e botão de novo documento */}
-      <div className="flex justify-end items-center mb-6 gap-2">
-        <FiltroDocumentos 
-          onFilterChange={filtrarDocumentos}
-          tiposDocumentos={tiposDocumentos}
-          categorias={categorias}
-          licitacoes={licitacoes}
-        />
-        <NovoDocumento
-          onDocumentoAdded={(novoDocumento) => {
-            // Aqui você pode implementar a lógica para adicionar o documento à lista
-            console.log("Novo documento adicionado:", novoDocumento)
-          }}
-        />
+      <div className="flex justify-between items-center mb-4">
+        <h2 className="text-lg font-semibold">Lista de Documentos</h2>
+        <div className="flex items-center gap-2">
+          <FiltroDocumentos 
+            onFilterChange={filtrarDocumentos}
+            tiposDocumentos={tiposDocumentos}
+            categorias={categorias}
+            licitacoes={licitacoes}
+          />
+          <NovoDocumento
+            onDocumentoAdded={(novoDocumento) => {
+              // Aqui você pode implementar a lógica para adicionar o documento à lista
+              console.log("Novo documento adicionado:", novoDocumento)
+            }}
+          />
+        </div>
       </div>
+      <p className="text-sm text-muted-foreground mb-4">Gerenciamento de todos os documentos cadastrados</p>
 
       {/* Lista de documentos */}
       <div className="bg-white rounded-md border shadow-sm">
-        <div className="p-4 border-b">
-          <h2 className="text-lg font-semibold">Lista de Documentos</h2>
-          <p className="text-sm text-muted-foreground">Gerenciamento de todos os documentos cadastrados</p>
-        </div>
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead>
-              <tr className="border-b bg-muted/50">
-                <th className="text-left p-4 font-medium">Nome</th>
-                <th className="text-left p-4 font-medium">Tipo</th>
-                <th className="text-left p-4 font-medium">Categoria</th>
-                <th className="text-left p-4 font-medium">Licitação</th>
-                <th className="text-left p-4 font-medium">Data de Upload</th>
-                <th className="text-left p-4 font-medium">Tamanho</th>
-                <th className="text-left p-4 font-medium">Ações</th>
+              <tr className="border-b bg-muted/30 text-sm">
+                <th className="text-left p-3 font-medium">Nome</th>
+                <th className="text-left p-3 font-medium">Tipo</th>
+                <th className="text-left p-3 font-medium">Categoria</th>
+                <th className="text-left p-3 font-medium">Licitação</th>
+                <th className="text-left p-3 font-medium">Data de Upload</th>
+                <th className="text-left p-3 font-medium">Tamanho</th>
+                <th className="text-left p-3 font-medium">Ações</th>
               </tr>
             </thead>
             <tbody>
@@ -306,39 +306,39 @@ export default function DocumentosPage() {
                 filteredDocumentos.map((documento) => (
                   <tr
                     key={documento.id}
-                    className="border-b hover:bg-gray-50 cursor-pointer"
+                    className="border-b hover:bg-gray-50 cursor-pointer text-sm"
                     onClick={() => handleViewDocument(documento)}
                   >
-                    <td className="p-4">
+                    <td className="p-3">
                       <div className="flex items-center gap-2">
                         <FileText className="h-4 w-4 text-blue-500" />
                         {documento.nome}
                       </div>
                     </td>
-                    <td className="p-4">{documento.tipo}</td>
-                    <td className="p-4">
-                      <Badge variant="outline" className={getCategoryBadgeClass(documento.categoriaId)}>
+                    <td className="p-3">{documento.tipo}</td>
+                    <td className="p-3">
+                      <Badge variant="outline" className={`text-xs py-0.5 px-2 ${getCategoryBadgeClass(documento.categoriaId)}`}>
                         {documento.categoria}
                       </Badge>
                     </td>
-                    <td className="p-4">{documento.licitacao}</td>
-                    <td className="p-4">{documento.dataUpload}</td>
-                    <td className="p-4">{documento.tamanho}</td>
-                    <td className="p-4">
-                      <div className="flex gap-2">
+                    <td className="p-3">{documento.licitacao}</td>
+                    <td className="p-3">{documento.dataUpload}</td>
+                    <td className="p-3">{documento.tamanho}</td>
+                    <td className="p-3">
+                      <div className="flex gap-1">
                         <Button
                           variant="ghost"
                           size="icon"
-                          className="h-8 w-8"
+                          className="h-7 w-7"
                           onClick={(e) => {
                             e.stopPropagation()
                             handleViewDocument(documento)
                           }}
                         >
-                          <Eye className="h-4 w-4" />
+                          <Eye className="h-3.5 w-3.5" />
                         </Button>
-                        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => e.stopPropagation()}>
-                          <Download className="h-4 w-4" />
+                        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={(e) => e.stopPropagation()}>
+                          <Download className="h-3.5 w-3.5" />
                         </Button>
                       </div>
                     </td>
@@ -346,7 +346,7 @@ export default function DocumentosPage() {
                 ))
               ) : (
                 <tr>
-                  <td colSpan={7} className="p-8 text-center text-muted-foreground">
+                  <td colSpan={7} className="p-6 text-center text-muted-foreground">
                     Nenhum documento encontrado com os filtros selecionados.
                   </td>
                 </tr>

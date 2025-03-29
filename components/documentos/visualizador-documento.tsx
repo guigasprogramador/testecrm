@@ -87,8 +87,8 @@ export function VisualizadorDocumento({ documento, open, onOpenChange }: Visuali
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[800px] max-h-[90vh] w-[calc(100vw-2rem)] md:w-auto">
-        <div className="overflow-auto">
+      <DialogContent className="max-w-[95vw] lg:max-w-[80vw] max-h-[95vh] p-5">
+        <div className="overflow-auto h-full">
           <DialogHeader>
             <DialogTitle className="flex items-center">
               <FileText className="h-5 w-5 mr-2 text-blue-500" />
@@ -106,7 +106,7 @@ export function VisualizadorDocumento({ documento, open, onOpenChange }: Visuali
 
               <div className="mt-4">
                 {activeTab === "preview" && (
-                  <div className="border rounded-md h-[400px] md:h-[500px] flex flex-col relative">
+                  <div className="border rounded-md h-[75vh] flex flex-col relative">
                     {isLoading && (
                       <div className="absolute inset-0 flex items-center justify-center bg-background/80 z-10">
                         <div className="text-center">
@@ -204,43 +204,35 @@ export function VisualizadorDocumento({ documento, open, onOpenChange }: Visuali
                 )}
 
                 {activeTab === "content" && (
-                  <>
-                    <div className="mb-4 flex flex-col md:flex-row gap-2">
+                  <div className="space-y-4">
+                    <div className="relative">
+                      <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
                       <Input
                         placeholder="Buscar no conteúdo..."
+                        className="pl-8"
                         value={searchTerm}
                         onChange={(e) => setSearchTerm(e.target.value)}
-                        className="flex-1"
                       />
-                      <Button variant="outline">
-                        <Search className="h-4 w-4 mr-2" />
-                        Buscar
-                      </Button>
                     </div>
 
-                    <Card>
-                      <CardContent className="pt-6">
-                        <div className="border rounded-md p-4 h-[200px] md:h-[300px] overflow-y-auto">
-                          <p className="text-muted-foreground text-center">
-                            {documento.resumo || "Nenhum conteúdo disponível para este documento."}
-                          </p>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  </>
+                    {/* Aqui você pode implementar a pesquisa no conteúdo e exibir os resultados */}
+                    <p className="text-center text-muted-foreground py-8">
+                      A busca no conteúdo não está disponível para este documento
+                    </p>
+                  </div>
                 )}
               </div>
             </Tabs>
-          </div>
 
-          <div className="mt-4 flex justify-end gap-2">
-            <Button variant="outline" onClick={() => onOpenChange(false)}>
-              Fechar
-            </Button>
-            <Button>
-              <Download className="h-4 w-4 mr-2" />
-              Baixar Documento
-            </Button>
+            <div className="mt-4 flex justify-end gap-2">
+              <Button variant="outline">
+                <Download className="h-4 w-4 mr-2" />
+                Baixar
+              </Button>
+              <Button variant="outline" onClick={() => onOpenChange(false)}>
+                Fechar
+              </Button>
+            </div>
           </div>
         </div>
       </DialogContent>

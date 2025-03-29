@@ -10,11 +10,14 @@ interface LicitacaoKanbanBoardProps {
 
 // Definição das colunas do Kanban
 const columns = [
-  { id: "Em andamento", title: "Em andamento" },
-  { id: "Aguardando documentação", title: "Aguardando documentação" },
-  { id: "Em análise", title: "Em análise" },
-  { id: "Publicado", title: "Publicado" },
-  { id: "Encerrado", title: "Encerrado" },
+  { id: "analise_interna", title: "Análise Interna" },
+  { id: "analise_edital", title: "Análise de Edital" },
+  { id: "aguardando_pregao", title: "Aguardando Pregão" },
+  { id: "em_andamento", title: "Em Andamento" },
+  { id: "envio_documentos", title: "Envio de Documentos" },
+  { id: "assinaturas", title: "Assinaturas" },
+  { id: "vencida", title: "Vencida" },
+  { id: "nao_vencida", title: "Não Vencida" }
 ]
 
 export function LicitacaoKanbanBoard({ licitacoes, onUpdateStatus, onLicitacaoClick }: LicitacaoKanbanBoardProps) {
@@ -38,11 +41,14 @@ export function LicitacaoKanbanBoard({ licitacoes, onUpdateStatus, onLicitacaoCl
   // Função para obter a classe CSS para o badge de status
   const getStatusBadgeClass = (status: string): string => {
     const statusColors: Record<string, string> = {
-      "Em andamento": "bg-blue-100 text-blue-800",
-      "Aguardando documentação": "bg-yellow-100 text-yellow-800",
-      "Em análise": "bg-orange-100 text-orange-800",
-      "Publicado": "bg-green-100 text-green-800",
-      "Encerrado": "bg-red-100 text-red-800",
+      "analise_interna": "bg-purple-100 text-purple-800",
+      "analise_edital": "bg-indigo-100 text-indigo-800",
+      "aguardando_pregao": "bg-yellow-100 text-yellow-800",
+      "em_andamento": "bg-blue-100 text-blue-800",
+      "envio_documentos": "bg-amber-100 text-amber-800",
+      "assinaturas": "bg-blue-100 text-blue-800",
+      "vencida": "bg-green-100 text-green-800",
+      "nao_vencida": "bg-red-100 text-red-800"
     }
     return statusColors[status] || "bg-gray-100 text-gray-800"
   }

@@ -51,6 +51,8 @@ export function NovaOportunidade({ onOportunidadeAdded }: NovaOportunidadeProps)
     valor: "",
     status: "novo_lead",
     prazo: "",
+    tipo: "", // Produto ou Serviço
+    tipoFaturamento: "", // Direto ou Distribuidor (apenas para Produto)
   })
 
   // Estado para data de reunião
@@ -90,17 +92,16 @@ export function NovaOportunidade({ onOportunidadeAdded }: NovaOportunidadeProps)
         formData.nomeCliente &&
         formData.cnpj &&
         formData.contatoNome &&
-        formData.contatoTelefone &&
         formData.contatoEmail &&
         formData.segmento
       )
     } else if (activeTab === "oportunidade") {
-      return formData.titulo && formData.status
+      const tipoValid = formData.tipo && (formData.tipo === "servico" || (formData.tipo === "produto" && formData.tipoFaturamento))
+      return formData.titulo && formData.status && tipoValid
     } else if (activeTab === "reuniao") {
-      return dataReuniao && horaReuniao && responsaveis.some((r) => r.selecionado)
+      return true // Não há campos obrigatórios na aba de reunião
     }
-
-    return true
+    return false
   }
 
   const handleNextTab = () => {
@@ -154,6 +155,8 @@ export function NovaOportunidade({ onOportunidadeAdded }: NovaOportunidadeProps)
       responsaveisIds: responsaveis.filter((r) => r.selecionado).map((r) => r.id),
       criarEvento,
       enviarNotificacoes,
+      tipo: formData.tipo,
+      tipoFaturamento: formData.tipoFaturamento,
     }
 
     // Simular envio para API
@@ -194,6 +197,8 @@ export function NovaOportunidade({ onOportunidadeAdded }: NovaOportunidadeProps)
         valor: "",
         status: "novo_lead",
         prazo: "",
+        tipo: "",
+        tipoFaturamento: "",
       })
       setDataReuniao(undefined)
       setHoraReuniao("")
@@ -404,11 +409,47 @@ export function NovaOportunidade({ onOportunidadeAdded }: NovaOportunidadeProps)
                   <SelectItem value="agendamento_reuniao">Agendamento de Reunião</SelectItem>
                   <SelectItem value="levantamento_oportunidades">Levantamento de Oportunidades</SelectItem>
                   <SelectItem value="proposta_enviada">Proposta Enviada</SelectItem>
-                  <SelectItem value="negociacao">Negociação</SelectItem>
+                  <SelectItem value="negociacao">Em Negociação</SelectItem>
+                  <SelectItem value="ganho">Ganho</SelectItem>
+                  <SelectItem value="perdido">Perdido</SelectItem>
                 </SelectContent>
               </Select>
             </div>
 
+            <div className="space-y-2">
+              <Label htmlFor="tipo">
+                Tipo de Oportunidade <span className="text-red-500">*</span>
+              </Label>
+              <Select value={formData.tipo} onValueChange={(value) => handleSelectChange("tipo", value)}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione o tipo" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="produto">Produto</SelectItem>
+                  <SelectItem value="servico">Serviço</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {formData.tipo === "produto" && (
+              <div className="space-y-2">
+                <Label htmlFor="tipoFaturamento">
+                  Tipo de Faturamento <span className="text-red-500">*</span>
+                </Label>
+                <Select 
+                  value={formData.tipoFaturamento} 
+                  onValueChange={(value) => handleSelectChange("tipoFaturamento", value)}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecione o tipo de faturamento" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="direto">Faturamento Direto</SelectItem>
+                    <SelectItem value="distribuidor">Via Distribuidor</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
             <div className="flex justify-between mt-4">
               <Button variant="outline" onClick={handlePrevTab}>
                 Voltar
@@ -539,4 +580,3 @@ export function NovaOportunidade({ onOportunidadeAdded }: NovaOportunidadeProps)
     </Dialog>
   )
 }
-

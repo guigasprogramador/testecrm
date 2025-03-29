@@ -17,24 +17,24 @@ import { Slider } from "@/components/ui/slider"
 
 interface FiltroLicitacoesProps {
   onFilterChange: (filters: LicitacaoFiltros) => void
-  orgaos: string[]
-  responsaveis: string[]
-  modalidades: string[]
+  orgaos?: string[]
+  responsaveis?: string[]
+  modalidades?: string[]
 }
 
 export interface LicitacaoFiltros {
-  termo: string
-  status: string
-  orgao: string
-  responsavel: string
-  modalidade: string
-  dataInicio: Date | undefined
-  dataFim: Date | undefined
-  valorMinimo: number | undefined
-  valorMaximo: number | undefined
+  termo?: string
+  status?: string
+  orgao?: string
+  responsavel?: string
+  modalidade?: string
+  dataInicio?: Date | undefined
+  dataFim?: Date | undefined
+  valorMinimo?: number | undefined
+  valorMaximo?: number | undefined
 }
 
-export function FiltroLicitacoesOtimizado({ onFilterChange, orgaos, responsaveis, modalidades }: FiltroLicitacoesProps) {
+export function FiltroLicitacoesOtimizado({ onFilterChange, orgaos: propOrgaos, responsaveis: propResponsaveis, modalidades: propModalidades }: FiltroLicitacoesProps) {
   const [isOpen, setIsOpen] = useState(false)
   const [filtros, setFiltros] = useState<LicitacaoFiltros>({
     termo: "",
@@ -48,17 +48,65 @@ export function FiltroLicitacoesOtimizado({ onFilterChange, orgaos, responsaveis
     valorMaximo: undefined
   })
 
+  // Estados para armazenar dados de API caso as props não sejam fornecidas
+  const [orgaos, setOrgaos] = useState<string[]>(propOrgaos || [])
+  const [responsaveis, setResponsaveis] = useState<string[]>(propResponsaveis || [])
+  const [modalidades, setModalidades] = useState<string[]>(propModalidades || [])
+  const [carregandoDados, setCarregandoDados] = useState(false)
+
   const [activeFiltersCount, setActiveFiltersCount] = useState(0)
   const [valorRange, setValorRange] = useState<[number, number]>([0, 2000000])
 
   // Status de licitações
   const statusOptions = [
-    { value: "Em andamento", label: "Em andamento" },
-    { value: "Aguardando documentação", label: "Aguardando documentação" },
-    { value: "Em análise", label: "Em análise" },
-    { value: "Publicado", label: "Publicado" },
-    { value: "Encerrado", label: "Encerrado" },
+    { value: "todos", label: "Todos os status" },
+    { value: "analise_interna", label: "Em análise interna" },
+    { value: "aguardando_pregao", label: "Aguardando pregão" },
+    { value: "envio_documentos", label: "Envio de documentos" },
+    { value: "assinaturas", label: "Assinaturas" },
+    { value: "vencida", label: "Vencida" },
+    { value: "nao_vencida", label: "Não vencida" }
   ]
+
+  // Carregar dados da API se as props não forem fornecidas
+  useEffect(() => {
+    const carregarDados = async () => {
+      // Só busca dados da API se as props não forem fornecidas
+      if (!propOrgaos || !propResponsaveis || !propModalidades) {
+        try {
+          setCarregandoDados(true)
+          
+          // Buscar todas as licitações para extrair informações únicas
+          const response = await fetch('/api/licitacoes')
+          if (response.ok) {
+            const licitacoes = await response.json()
+            
+            // Extrair valores únicos
+            if (!propOrgaos) {
+              const orgaosUnicos = Array.from(new Set(licitacoes.map((l: any) => l.orgao)))
+              setOrgaos(orgaosUnicos)
+            }
+            
+            if (!propResponsaveis) {
+              const responsaveisUnicos = Array.from(new Set(licitacoes.map((l: any) => l.responsavel)))
+              setResponsaveis(responsaveisUnicos)
+            }
+            
+            if (!propModalidades) {
+              const modalidadesUnicas = Array.from(new Set(licitacoes.map((l: any) => l.modalidade)))
+              setModalidades(modalidadesUnicas)
+            }
+          }
+        } catch (error) {
+          console.error('Erro ao carregar dados para filtros:', error)
+        } finally {
+          setCarregandoDados(false)
+        }
+      }
+    }
+    
+    carregarDados()
+  }, [propOrgaos, propResponsaveis, propModalidades])
 
   // Atualiza o contador de filtros ativos
   useEffect(() => {

@@ -24,249 +24,216 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { toast } from "@/components/ui/use-toast"
 
 export default function LicitacoesPage() {
-  const [licitacoes, setLicitacoes] = useState<Licitacao[]>([
-    {
-      id: "1",
-      titulo: "Aquisição de Equipamentos de Informática",
-      orgao: "Prefeitura de São Paulo",
-      status: "Em andamento",
-      dataAbertura: "2023-05-15",
-      valorEstimado: 1500000,
-      modalidade: "Pregão Eletrônico",
-      objeto: "Aquisição de computadores e periféricos",
-      edital: "EDITAL-2023-001",
-      responsavel: "Carlos Silva",
-      documentos: [
-        { nome: "Edital", url: "#" },
-        { nome: "Anexo I", url: "#" },
-      ]
-    },
-    {
-      id: "2",
-      titulo: "Contratação de Serviços de Limpeza",
-      orgao: "Secretaria de Educação",
-      status: "Encerrado",
-      dataAbertura: "2023-04-10",
-      valorEstimado: 800000,
-      modalidade: "Concorrência",
-      objeto: "Serviços de limpeza para escolas municipais",
-      edital: "EDITAL-2023-002",
-      responsavel: "Ana Oliveira",
-      documentos: [
-        { nome: "Edital", url: "#" },
-        { nome: "Anexo I", url: "#" },
-      ]
-    },
-    {
-      id: "3",
-      titulo: "Construção de Ponte",
-      orgao: "Departamento de Infraestrutura",
-      status: "Aguardando documentação",
-      dataAbertura: "2023-06-20",
-      valorEstimado: 5000000,
-      modalidade: "Concorrência",
-      objeto: "Construção de ponte sobre o Rio Tietê",
-      edital: "EDITAL-2023-003",
-      responsavel: "Roberto Almeida",
-      documentos: [
-        { nome: "Edital", url: "#" },
-        { nome: "Anexo I", url: "#" },
-      ]
-    },
-    {
-      id: "4",
-      titulo: "Fornecimento de Merenda Escolar",
-      orgao: "Secretaria de Educação",
-      status: "Em análise",
-      dataAbertura: "2023-05-25",
-      valorEstimado: 1200000,
-      modalidade: "Pregão Eletrônico",
-      objeto: "Fornecimento de merenda para escolas municipais",
-      edital: "EDITAL-2023-004",
-      responsavel: "Fernanda Costa",
-      documentos: [
-        { nome: "Edital", url: "#" },
-        { nome: "Anexo I", url: "#" },
-      ]
-    },
-    {
-      id: "5",
-      titulo: "Manutenção de Frota",
-      orgao: "Secretaria de Transportes",
-      status: "Publicado",
-      dataAbertura: "2023-07-05",
-      valorEstimado: 900000,
-      modalidade: "Pregão Presencial",
-      objeto: "Manutenção preventiva e corretiva da frota municipal",
-      edital: "EDITAL-2023-005",
-      responsavel: "Ricardo Santos",
-      documentos: [
-        { nome: "Edital", url: "#" },
-        { nome: "Anexo I", url: "#" },
-      ]
-    },
-    {
-      id: "6",
-      titulo: "Reforma de Escola",
-      orgao: "Secretaria de Educação",
-      status: "Em andamento",
-      dataAbertura: "2023-06-10",
-      valorEstimado: 2000000,
-      modalidade: "Tomada de Preços",
-      objeto: "Reforma da Escola Municipal João da Silva",
-      edital: "EDITAL-2023-006",
-      responsavel: "Mariana Souza",
-      documentos: [
-        { nome: "Edital", url: "#" },
-        { nome: "Anexo I", url: "#" },
-      ]
-    },
-    {
-      id: "7",
-      titulo: "Aquisição de Medicamentos",
-      orgao: "Secretaria de Saúde",
-      status: "Aguardando documentação",
-      dataAbertura: "2023-07-15",
-      valorEstimado: 3000000,
-      modalidade: "Pregão Eletrônico",
-      objeto: "Aquisição de medicamentos para rede municipal",
-      edital: "EDITAL-2023-007",
-      responsavel: "Paulo Mendes",
-      documentos: [
-        { nome: "Edital", url: "#" },
-        { nome: "Anexo I", url: "#" },
-      ]
-    },
-  ])
-
-  const [filteredLicitacoes, setFilteredLicitacoes] = useState<Licitacao[]>([])
-  const [searchTerm, setSearchTerm] = useState("")
-  const [statusFilter, setStatusFilter] = useState("todos")
-  const [responsavelFilter, setResponsavelFilter] = useState("todos")
-  const [activeTab, setActiveTab] = useState("lista")
+  const [licitacoes, setLicitacoes] = useState<Licitacao[]>([])
+  const [loading, setLoading] = useState(true)
   const [selectedLicitacao, setSelectedLicitacao] = useState<Licitacao | null>(null)
   const [selectedOrgao, setSelectedOrgao] = useState<Orgao | null>(null)
   const [detailsOpen, setDetailsOpen] = useState(false)
   const [orgaoDetailsOpen, setOrgaoDetailsOpen] = useState(false)
-  const [activeFilters, setActiveFilters] = useState(0)
-  const [showEditarLicitacao, setShowEditarLicitacao] = useState(false)
-  const [showConfirmDelete, setShowConfirmDelete] = useState(false)
-  const [licitacaoToDelete, setLicitacaoToDelete] = useState<string | null>(null)
+  const [abaAtiva, setAbaAtiva] = useState("lista")
+  const [excluirLicitacaoId, setExcluirLicitacaoId] = useState<string | null>(null)
+  const [dialogExcluirAberto, setDialogExcluirAberto] = useState(false)
+  const [filtros, setFiltros] = useState<LicitacaoFiltros>({})
+  const [filteredLicitacoes, setFilteredLicitacoes] = useState<Licitacao[]>([])
+  const [estatisticas, setEstatisticas] = useState({
+    total: 0,
+    ativas: 0,
+    vencidas: 0,
+    valorTotal: 0,
+    pregoesProximos: 0,
+    taxaSucesso: 0
+  })
 
   // Extrair listas de valores únicos para os filtros
-  const orgaos = Array.from(new Set(licitacoes.map(item => item.orgao)))
-  const responsaveis = Array.from(new Set(licitacoes.map(item => item.responsavel)))
-  const modalidades = Array.from(new Set(licitacoes.map(item => item.modalidade)))
+  const orgaos = filteredLicitacoes.map(item => item.orgao)
+  const responsaveis = filteredLicitacoes.map(item => item.responsavel)
+  const modalidades = filteredLicitacoes.map(item => item.modalidade)
 
-  // Estatísticas
-  const licitacoesAtivas = 38 // Valor fixo para corresponder à imagem
-  const licitacoesVencidas = 46 // Valor fixo para corresponder à imagem
-  const totalEmLicitacoes = 12000.0 // Valor fixo para corresponder à imagem
-  const taxaSucesso = 86 // Valor fixo para corresponder à imagem
-  const pregoesEssaSemana = 3 // Valor fixo para corresponder à imagem
+  // Carregar dados da API
+  const carregarLicitacoes = async () => {
+    try {
+      setLoading(true)
+      
+      // Montar parâmetros de consulta com base nos filtros
+      const params = new URLSearchParams()
+      
+      if (filtros.termo) params.append('termo', filtros.termo)
+      if (filtros.status) params.append('status', filtros.status)
+      if (filtros.orgao) params.append('orgao', filtros.orgao)
+      if (filtros.responsavel) params.append('responsavel', filtros.responsavel)
+      if (filtros.modalidade) params.append('modalidade', filtros.modalidade)
+      if (filtros.dataInicio) params.append('dataInicio', filtros.dataInicio)
+      if (filtros.dataFim) params.append('dataFim', filtros.dataFim)
+      if (filtros.valorMinimo) params.append('valorMinimo', filtros.valorMinimo.toString())
+      if (filtros.valorMaximo) params.append('valorMaximo', filtros.valorMaximo.toString())
+      
+      const response = await fetch(`/api/licitacoes?${params.toString()}`)
+      
+      if (!response.ok) {
+        throw new Error('Erro ao carregar licitações')
+      }
+      
+      const data = await response.json()
+      setLicitacoes(data)
+      setFilteredLicitacoes(data)
 
-  useEffect(() => {
-    applyFilters()
-  }, [searchTerm, statusFilter, responsavelFilter, licitacoes])
-
-  const applyFilters = () => {
-    let filtered = [...licitacoes]
-    let activeFilterCount = 0
-
-    if (searchTerm) {
-      filtered = filtered.filter(
-        (item) =>
-          item.titulo.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          item.orgao.toLowerCase().includes(searchTerm.toLowerCase()),
-      )
-      activeFilterCount++
-    }
-
-    if (statusFilter !== "todos") {
-      // Verificar se o status é um status comercial ou de licitação
-      filtered = filtered.filter((item) => {
-        if (statusMapping[item.status] === statusFilter) return true
-        return item.status === statusFilter
+      // Carregar estatísticas
+      const statsResponse = await fetch('/api/licitacoes?estatisticas=true')
+      if (statsResponse.ok) {
+        const statsData = await statsResponse.json()
+        setEstatisticas(statsData)
+      }
+    } catch (error) {
+      console.error('Erro ao carregar licitações:', error)
+      toast({
+        title: "Erro",
+        description: "Não foi possível carregar as licitações.",
+        variant: "destructive"
       })
-      activeFilterCount++
+    } finally {
+      setLoading(false)
     }
-
-    if (responsavelFilter !== "todos") {
-      filtered = filtered.filter((item) => item.responsavel === responsavelFilter)
-      activeFilterCount++
-    }
-
-    setFilteredLicitacoes(filtered)
-    setActiveFilters(activeFilterCount)
   }
 
-  // Nova função para aplicar filtros otimizados
-  const handleFilterChange = (filtros: LicitacaoFiltros) => {
+  // Carregar dados iniciais
+  useEffect(() => {
+    carregarLicitacoes()
+  }, [])
+
+  // Adicionar nova licitação
+  const handleLicitacaoAdded = async (novaLicitacao: Licitacao) => {
+    toast({
+      title: "Sucesso!",
+      description: "Licitação criada com sucesso.",
+      variant: "default"
+    })
+    
+    // Recarregar a lista após adicionar
+    await carregarLicitacoes()
+  }
+
+  // Atualizar licitação
+  const handleLicitacaoUpdate = async (licitacaoAtualizada: Licitacao) => {
+    try {
+      const response = await fetch(`/api/licitacoes/${licitacaoAtualizada.id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(licitacaoAtualizada),
+      })
+
+      if (!response.ok) {
+        throw new Error('Erro ao atualizar licitação')
+      }
+
+      toast({
+        title: "Sucesso!",
+        description: "Licitação atualizada com sucesso.",
+        variant: "default"
+      })
+
+      // Recarregar a lista após atualizar
+      await carregarLicitacoes()
+    } catch (error) {
+      console.error('Erro ao atualizar licitação:', error)
+      toast({
+        title: "Erro",
+        description: "Não foi possível atualizar a licitação.",
+        variant: "destructive"
+      })
+    }
+  }
+
+  // Confirmar exclusão de licitação
+  const handleDeleteLicitacao = (id: string) => {
+    setExcluirLicitacaoId(id)
+    setDialogExcluirAberto(true)
+  }
+
+  // Excluir licitação
+  const confirmDeleteLicitacao = async () => {
+    if (!excluirLicitacaoId) return
+
+    try {
+      const response = await fetch(`/api/licitacoes/${excluirLicitacaoId}`, {
+        method: 'DELETE',
+      })
+
+      if (!response.ok) {
+        throw new Error('Erro ao excluir licitação')
+      }
+
+      toast({
+        title: "Sucesso!",
+        description: "Licitação excluída com sucesso.",
+        variant: "default"
+      })
+
+      // Fechar e resetar os detalhes se a licitação excluída estiver aberta
+      if (selectedLicitacao && selectedLicitacao.id === excluirLicitacaoId) {
+        setDetailsOpen(false)
+        setSelectedLicitacao(null)
+      }
+
+      // Recarregar a lista após excluir
+      await carregarLicitacoes()
+    } catch (error) {
+      console.error('Erro ao excluir licitação:', error)
+      toast({
+        title: "Erro",
+        description: "Não foi possível excluir a licitação.",
+        variant: "destructive"
+      })
+    } finally {
+      // Fechar o diálogo de confirmação
+      setDialogExcluirAberto(false)
+      setExcluirLicitacaoId(null)
+    }
+  }
+
+  // Aplicar filtros localmente (quando necessário para filtros que a API não suporta)
+  const handleFilterChange = (novosFiltros: LicitacaoFiltros) => {
+    setFiltros(novosFiltros)
+    
+    // Para filtros que necessitam de resposta imediata na UI, aplicamos localmente também
     let filtered = [...licitacoes]
-
-    // Filtro por termo
-    if (filtros.termo) {
-      filtered = filtered.filter(
-        (item) =>
-          item.titulo.toLowerCase().includes(filtros.termo.toLowerCase()) ||
-          item.orgao.toLowerCase().includes(filtros.termo.toLowerCase()),
-      )
-    }
-
-    // Filtro por status
-    if (filtros.status !== "todos") {
-      filtered = filtered.filter((item) => item.status === filtros.status)
-    }
-
-    // Filtro por órgão
-    if (filtros.orgao !== "todos") {
-      filtered = filtered.filter((item) => item.orgao === filtros.orgao)
-    }
-
-    // Filtro por responsável
-    if (filtros.responsavel !== "todos") {
-      filtered = filtered.filter((item) => item.responsavel === filtros.responsavel)
-    }
-
-    // Filtro por modalidade
-    if (filtros.modalidade !== "todos") {
-      filtered = filtered.filter((item) => item.modalidade === filtros.modalidade)
-    }
-
-    // Filtro por data de abertura - início
-    if (filtros.dataInicio) {
-      filtered = filtered.filter((item) => {
-        const dataAbertura = new Date(item.dataAbertura)
-        return dataAbertura >= filtros.dataInicio!
-      })
-    }
-
-    // Filtro por data de abertura - fim
-    if (filtros.dataFim) {
-      filtered = filtered.filter((item) => {
-        const dataAbertura = new Date(item.dataAbertura)
-        return dataAbertura <= filtros.dataFim!
-      })
-    }
-
-    // Filtro por valor estimado - mínimo
-    if (filtros.valorMinimo !== undefined) {
-      filtered = filtered.filter((item) => item.valorEstimado >= filtros.valorMinimo!)
-    }
-
-    // Filtro por valor estimado - máximo
-    if (filtros.valorMaximo !== undefined) {
-      filtered = filtered.filter((item) => item.valorEstimado <= filtros.valorMaximo!)
-    }
-
+    
+    // Aplicar filtros locais (complementares aos filtros da API)
+    // Este trecho pode ser ajustado conforme necessidade
+    
     setFilteredLicitacoes(filtered)
     
-    // Atualizar os filtros antigos para manter compatibilidade
-    setSearchTerm(filtros.termo)
-    setStatusFilter(filtros.status)
-    setResponsavelFilter(filtros.responsavel)
+    // Recarregar da API com os novos filtros
+    carregarLicitacoes()
   }
 
+  // Formatar valor monetário
+  const formatarValor = (valor: number): string => {
+    return valor.toLocaleString('pt-BR', {
+      style: 'currency',
+      currency: 'BRL',
+    })
+  }
+  
+  // Formatar valor monetário de forma compacta para os cards
+  const formatarValorCompacto = (valor: number): string => {
+    if (valor >= 1000000) {
+      return `${(valor / 1000000).toFixed(1)}M`
+    } else if (valor >= 1000) {
+      return `${(valor / 1000).toFixed(1)}K`
+    } else {
+      return valor.toLocaleString('pt-BR')
+    }
+  }
+
+  // Abrir detalhes da licitação
+  const handleLicitacaoClick = (licitacao: Licitacao) => {
+    setSelectedLicitacao(licitacao)
+    setDetailsOpen(true)
+  }
+
+  // Abrir detalhes do órgão
   const handleOrgaoClick = (orgaoNome: string) => {
     if (detailsOpen) {
       setDetailsOpen(false)
@@ -282,254 +249,213 @@ export default function LicitacoesPage() {
     }
   }
 
-  const handleUpdateStatus = (id: string, newStatus: string) => {
-    setLicitacoes((prevLicitacoes) =>
-      prevLicitacoes.map((lic) => (lic.id === id ? { ...lic, status: newStatus } : lic)),
-    )
-
-    if (selectedLicitacao && selectedLicitacao.id === id) {
-      setSelectedLicitacao((prev) => (prev ? { ...prev, status: newStatus } : null))
+  // Atualizar status de uma licitação
+  const handleUpdateStatus = async (id: string, newStatus: string) => {
+    const licitacao = licitacoes.find(l => l.id === id)
+    if (!licitacao) return
+    
+    try {
+      const response = await fetch(`/api/licitacoes/${id}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ status: newStatus }),
+      })
+      
+      if (!response.ok) {
+        throw new Error('Erro ao atualizar status da licitação')
+      }
+      
+      // Atualizar localmente para feedback imediato ao usuário
+      setLicitacoes(prevLicitacoes =>
+        prevLicitacoes.map(lic => (lic.id === id ? { ...lic, status: newStatus } : lic))
+      )
+      
+      setFilteredLicitacoes(prevFiltered =>
+        prevFiltered.map(lic => (lic.id === id ? { ...lic, status: newStatus } : lic))
+      )
+      
+      if (selectedLicitacao && selectedLicitacao.id === id) {
+        setSelectedLicitacao(prev => (prev ? { ...prev, status: newStatus } : null))
+      }
+      
+      toast({
+        title: "Status atualizado",
+        description: "O status da licitação foi atualizado com sucesso.",
+      })
+    } catch (error) {
+      console.error('Erro ao atualizar status:', error)
+      toast({
+        title: "Erro",
+        description: "Não foi possível atualizar o status da licitação.",
+        variant: "destructive"
+      })
     }
   }
 
+  // Atualizar órgão
   const handleOrgaoUpdate = (orgaoAtualizado: Orgao) => {
-    // In a real app, this would update the orgao in the database
+    // Aqui seria uma chamada de API para atualizar o órgão
     console.log("Órgão atualizado:", orgaoAtualizado)
     
     // Update the licitacoes list with the new orgao name if it changed
     if (orgaoAtualizado.nome !== selectedOrgao?.nome) {
-      setLicitacoes(prev => 
-        prev.map(lic => 
-          lic.orgao === selectedOrgao?.nome 
-            ? { ...lic, orgao: orgaoAtualizado.nome } 
-            : lic
-        )
-      )
+      // Em um cenário real, precisaríamos atualizar todas as licitações associadas a este órgão
+      toast({
+        title: "Órgão atualizado",
+        description: "O órgão foi atualizado com sucesso. As licitações associadas serão atualizadas.",
+      })
     }
     
     // Update the selected orgao
     setSelectedOrgao(orgaoAtualizado)
   }
 
+  // Excluir órgão
   const handleOrgaoDelete = (orgao: Orgao) => {
-    // In a real app, this would delete the orgao from the database
-    console.log("Órgão excluído:", orgao)
+    // Em um cenário real, precisaríamos verificar se há licitações associadas
+    toast({
+      title: "Órgão excluído",
+      description: "O órgão foi excluído com sucesso.",
+    })
     
-    // Remove licitacoes related to this orgao
-    setLicitacoes(prev => 
-      prev.filter(lic => lic.orgao !== orgao.nome)
-    )
-    
-    // Update the filtered licitacoes
-    applyFilters()
+    setOrgaoDetailsOpen(false)
+    setSelectedOrgao(null)
   }
 
-  const handleLicitacaoUpdate = (licitacaoAtualizada: Licitacao) => {
-    // In a real app, this would update the licitacao in the database
-    console.log("Licitau00e7u00e3o atualizada:", licitacaoAtualizada)
-    
-    // Update the licitacoes list
-    setLicitacoes(prev => 
-      prev.map(lic => 
-        lic.id === licitacaoAtualizada.id 
-          ? { ...licitacaoAtualizada } 
-          : lic
-      )
-    )
-    
-    // Apply filters to update the filtered list
-    applyFilters()
-  }
-
-  const handleLicitacaoDelete = (licitacao: Licitacao) => {
-    // In a real app, this would delete the licitacao from the database
-    console.log("Licitau00e7u00e3o excluu00edda:", licitacao)
-    
-    // Remove the licitacao from the list
-    setLicitacoes(prev => 
-      prev.filter(lic => lic.id !== licitacao.id)
-    )
-    
-    // Apply filters to update the filtered list
-    applyFilters()
-  }
-
-  const handleLicitacaoClick = (licitacao: Licitacao) => {
-    setSelectedLicitacao(licitacao)
-    setDetailsOpen(true)
-  }
-
-  // Funu00e7u00e3o para excluir uma licitau00e7u00e3o
-  const handleDeleteLicitacao = (id: string) => {
-    setLicitacaoToDelete(id)
-    setShowConfirmDelete(true)
-  }
-
-  // Funu00e7u00e3o para confirmar a exclusu00e3o
-  const confirmDeleteLicitacao = () => {
-    if (licitacaoToDelete) {
-      setLicitacoes(licitacoes.filter(item => item.id !== licitacaoToDelete))
-      setFilteredLicitacoes(filteredLicitacoes.filter(item => item.id !== licitacaoToDelete))
-      setShowConfirmDelete(false)
-      setLicitacaoToDelete(null)
+  // Funções para ações na tabela
+  const handleDownloadEdital = (licitacao: Licitacao) => {
+    if (licitacao.urlEdital) {
+      window.open(licitacao.urlEdital, '_blank')
+    } else {
       toast({
-        title: "Licitau00e7u00e3o excluu00edda",
-        description: "A licitau00e7u00e3o foi excluu00edda com sucesso.",
+        title: "Edital não disponível",
+        description: "O edital desta licitação não está disponível para download.",
+        variant: "destructive"
       })
     }
   }
 
-  // Funu00e7u00e3o para editar uma licitau00e7u00e3o
-  const handleEditLicitacao = (licitacao: Licitacao) => {
-    setSelectedLicitacao(licitacao)
-    setShowEditarLicitacao(true)
-    setDetailsOpen(true)
-  }
-
-  // Funu00e7u00e3o para baixar o edital
-  const handleDownloadEdital = (licitacao: Licitacao) => {
-    // Simulau00e7u00e3o de download do edital
-    toast({
-      title: "Download iniciado",
-      description: `O edital da licitau00e7u00e3o ${licitacao.titulo} estu00e1 sendo baixado.`,
-    })
-  }
-
-  // Funu00e7u00e3o para compartilhar licitau00e7u00e3o
   const handleShareLicitacao = (licitacao: Licitacao) => {
-    // Simulau00e7u00e3o de compartilhamento
-    toast({
-      title: "Licitau00e7u00e3o compartilhada",
-      description: `Um link para compartilhar a licitau00e7u00e3o foi copiado para a u00e1rea de transferu00eancia.`,
-    })
+    // Simulação de compartilhamento
+    const url = licitacao.urlLicitacao || window.location.href
+    
+    // Em uma implementação real, usaríamos a Web Share API
+    if (navigator.share) {
+      navigator.share({
+        title: licitacao.titulo,
+        text: `Licitação: ${licitacao.titulo}`,
+        url: url
+      })
+    } else {
+      // Fallback: copiar link para área de transferência
+      navigator.clipboard.writeText(url).then(() => {
+        toast({
+          title: "Link copiado",
+          description: "O link da licitação foi copiado para a área de transferência.",
+        })
+      })
+    }
   }
 
-  // Funu00e7u00e3o para enviar email relacionado u00e0 licitau00e7u00e3o
   const handleSendEmail = (licitacao: Licitacao) => {
-    // Simulau00e7u00e3o de envio de email
-    toast({
-      title: "Email agendado",
-      description: `Um email seru00e1 enviado para o u00f3rgu00e3o ${licitacao.orgao}.`,
-    })
+    const contato = licitacao.contatoEmail || ""
+    if (contato) {
+      window.location.href = `mailto:${contato}?subject=Licitação: ${licitacao.titulo}`
+    } else {
+      toast({
+        title: "Email não disponível",
+        description: "Não há um contato de email disponível para esta licitação.",
+        variant: "destructive"
+      })
+    }
   }
 
-  // Funu00e7u00e3o para agendar ligau00e7u00e3o
   const handleScheduleCall = (licitacao: Licitacao) => {
-    // Simulau00e7u00e3o de agendamento de ligau00e7u00e3o
-    toast({
-      title: "Ligau00e7u00e3o agendada",
-      description: `Uma ligau00e7u00e3o foi agendada para o u00f3rgu00e3o ${licitacao.orgao}.`,
-    })
+    const telefone = licitacao.contatoTelefone || ""
+    if (telefone) {
+      toast({
+        title: "Ligação agendada",
+        description: `Uma ligação foi agendada para o contato: ${telefone}`,
+      })
+    } else {
+      toast({
+        title: "Telefone não disponível",
+        description: "Não há um contato telefônico disponível para esta licitação.",
+        variant: "destructive"
+      })
+    }
   }
 
-  // Funu00e7u00e3o para marcar como ganho
-  const handleMarkAsWon = (licitacao: Licitacao) => {
-    const updatedLicitacoes = licitacoes.map(item => {
-      if (item.id === licitacao.id) {
-        return { ...item, status: "Ganho" }
-      }
-      return item
-    })
-    setLicitacoes(updatedLicitacoes)
-    applyFilters()
-    toast({
-      title: "Licitau00e7u00e3o atualizada",
-      description: "A licitau00e7u00e3o foi marcada como ganha.",
-    })
+  const handleMarkAsWon = async (licitacao: Licitacao) => {
+    await handleUpdateStatus(licitacao.id, "vencida")
   }
 
-  // Funu00e7u00e3o para marcar como perdido
-  const handleMarkAsLost = (licitacao: Licitacao) => {
-    const updatedLicitacoes = licitacoes.map(item => {
-      if (item.id === licitacao.id) {
-        return { ...item, status: "Perdido" }
-      }
-      return item
-    })
-    setLicitacoes(updatedLicitacoes)
-    applyFilters()
-    toast({
-      title: "Licitau00e7u00e3o atualizada",
-      description: "A licitau00e7u00e3o foi marcada como perdida.",
-      variant: "destructive"
-    })
-  }
-
-  // Mapeamento de status para garantir compatibilidade
-  const statusMapping: Record<string, string> = {
-    // Mapeamento de status de licitações para status comerciais
-    analise_interna: "novo_lead",
-    aguardando_pregao: "levantamento_oportunidades",
-    envio_documentos: "proposta_enviada",
-    assinaturas: "negociacao",
-    vencida: "fechado_ganho",
-    nao_vencida: "fechado_perdido",
-    concluida: "fechado_ganho",
+  const handleMarkAsLost = async (licitacao: Licitacao) => {
+    await handleUpdateStatus(licitacao.id, "nao_vencida")
   }
 
   return (
-    <div className="p-4 md:p-6 overflow-hidden">
-      <h1 className="text-2xl font-bold mb-6">Licitações</h1>
+    <div className="p-8">
+      <h1 className="text-3xl font-bold mb-6">Licitações</h1>
 
       {/* Cards de estatísticas */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 mb-8">
         <Card>
           <CardContent className="p-6">
-            <div className="text-3xl font-bold">{licitacoesAtivas}</div>
+            <div className="text-3xl font-bold truncate">{estatisticas.total}</div>
+            <div className="text-sm text-muted-foreground">Licitações totais</div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="p-6">
+            <div className="text-3xl font-bold truncate">{estatisticas.ativas}</div>
             <div className="text-sm text-muted-foreground">Licitações ativas</div>
           </CardContent>
         </Card>
 
         <Card>
           <CardContent className="p-6">
-            <div className="text-3xl font-bold">{licitacoesVencidas}</div>
+            <div className="text-3xl font-bold truncate">{estatisticas.vencidas}</div>
             <div className="text-sm text-muted-foreground">Licitações vencidas</div>
           </CardContent>
         </Card>
 
         <Card>
           <CardContent className="p-6">
-            <div className="text-3xl font-bold">
-              {totalEmLicitacoes.toLocaleString("pt-BR", {
-                minimumFractionDigits: 2,
-                maximumFractionDigits: 2,
-              })}
+            <div className="flex flex-col">
+              <div className="text-xl sm:text-2xl lg:text-3xl font-bold truncate">{formatarValorCompacto(estatisticas.valorTotal)}</div>
+              <div className="text-sm text-muted-foreground">R$ total em licitações</div>
             </div>
-            <div className="text-sm text-muted-foreground">R$ total em licitações</div>
           </CardContent>
         </Card>
 
         <Card>
           <CardContent className="p-6">
-            <div className="text-3xl font-bold">{taxaSucesso}%</div>
+            <div className="text-3xl font-bold truncate">{estatisticas.taxaSucesso}%</div>
             <div className="text-sm text-muted-foreground">Taxa de sucesso</div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="p-6">
-            <div className="text-3xl font-bold">{pregoesEssaSemana}</div>
-            <div className="text-sm text-muted-foreground">Pregões essa semana</div>
           </CardContent>
         </Card>
       </div>
 
       {/* Abas e Filtros */}
       <div className="flex flex-col gap-4">
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+        <Tabs value={abaAtiva} onValueChange={setAbaAtiva} className="w-full">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-2">
               <Button
                 size="sm"
-                onClick={() => setActiveTab("kanban")}
-                variant={activeTab === "kanban" ? "default" : "outline"}
+                onClick={() => setAbaAtiva("kanban")}
+                variant={abaAtiva === "kanban" ? "default" : "outline"}
               >
                 Kanban
               </Button>
               <Button
                 size="sm"
-                onClick={() => setActiveTab("lista")}
-                variant={activeTab === "lista" ? "default" : "outline"}
+                onClick={() => setAbaAtiva("lista")}
+                variant={abaAtiva === "lista" ? "default" : "outline"}
               >
                 Lista
               </Button>
@@ -543,180 +469,174 @@ export default function LicitacoesPage() {
                 modalidades={modalidades}
               />
               <NovaLicitacao
-                onLicitacaoAdded={(novaLicitacao: Licitacao) => {
-                  setLicitacoes((prev) => [novaLicitacao, ...prev])
-                }}
+                onLicitacaoAdded={handleLicitacaoAdded}
               />
             </div>
           </div>
 
-          {/* Conteúdo das abas */}
-          <TabsContent value="lista">
-            <div className="bg-white rounded-md border shadow-sm">
-              <div className="p-4 border-b">
-                <h2 className="text-lg font-semibold">Lista de Licitações</h2>
-                <p className="text-sm text-muted-foreground">Gerenciamento de todas as licitações cadastradas</p>
-              </div>
-              <div className="overflow-x-auto">
-                <table className="w-full">
-                  <thead>
-                    <tr className="border-b bg-muted/50">
-                      <th className="text-left p-4 font-medium">Título</th>
-                      <th className="text-left p-4 font-medium">Órgão</th>
-                      <th className="text-left p-4 font-medium">Valor</th>
-                      <th className="text-left p-4 font-medium">Responsável</th>
-                      <th className="text-left p-4 font-medium">Data de Abertura</th>
-                      <th className="text-left p-4 font-medium">Status</th>
-                      <th className="text-left p-4 font-medium">Ações</th>
+          {/* Tabela de licitações */}
+          <TabsContent value="lista" className="mt-4">
+            <div className="rounded-md border shadow-sm">
+              <div className="relative overflow-x-auto">
+                <table className="w-full text-sm text-left">
+                  <thead className="text-xs uppercase bg-gray-50">
+                    <tr>
+                      <th className="p-4">Título</th>
+                      <th className="p-4">Órgão</th>
+                      <th className="p-4">Valor</th>
+                      <th className="p-4">Responsável</th>
+                      <th className="p-4">Data de Abertura</th>
+                      <th className="p-4">Status</th>
+                      <th className="p-4">Ações</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {filteredLicitacoes.map((licitacao) => (
-                      <tr
-                        key={licitacao.id}
-                        className="border-b cursor-pointer hover:bg-gray-50"
-                        onClick={() => handleLicitacaoClick(licitacao)}
-                      >
-                        <td className="p-4">{licitacao.titulo}</td>
-                        <td className="p-4">
-                          <Button
-                            variant="link"
-                            className="p-0 h-auto"
-                            onClick={(e) => {
-                              e.stopPropagation()
-                              handleOrgaoClick(licitacao.orgao)
-                            }}
-                          >
-                            {licitacao.orgao}
-                          </Button>
-                        </td>
-                        <td className="p-4">{licitacao.valorEstimado.toLocaleString("pt-BR", {
-                minimumFractionDigits: 2,
-                maximumFractionDigits: 2,
-              })}</td>
-                        <td className="p-4">{licitacao.responsavel}</td>
-                        <td className="p-4">
-                          <span
-                            className={
-                              licitacao.status === "Em andamento"
-                                ? "text-blue-500"
-                                : licitacao.status === "Encerrado"
-                                  ? "text-red-500"
-                                  : "text-green-500"
-                            }
-                          >
-                            {licitacao.dataAbertura}
-                          </span>
-                        </td>
-                        <td className="p-4">
-                          <StatusBadge status={licitacao.status} />
-                        </td>
-                        <td className="p-4">
-                          <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={(e) => {
-                                  e.stopPropagation()
-                                }}
-                              >
-                                <MoreHorizontal className="w-4 h-4" />
-                              </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end" className="w-56">
-                              <DropdownMenuLabel>Au00e7u00f5es</DropdownMenuLabel>
-                              <DropdownMenuSeparator />
-                              <DropdownMenuItem
-                                onClick={(e) => {
-                                  e.stopPropagation()
-                                  handleEditLicitacao(licitacao)
-                                }}
-                              >
-                                <Edit className="mr-2 h-4 w-4" />
-                                Editar
-                              </DropdownMenuItem>
-                              <DropdownMenuItem
-                                onClick={(e) => {
-                                  e.stopPropagation()
-                                  handleDeleteLicitacao(licitacao.id)
-                                }}
-                                className="text-destructive"
-                              >
-                                <Trash className="mr-2 h-4 w-4" />
-                                Excluir
-                              </DropdownMenuItem>
-                              <DropdownMenuSeparator />
-                              <DropdownMenuItem
-                                onClick={(e) => {
-                                  e.stopPropagation()
-                                  handleDownloadEdital(licitacao)
-                                }}
-                              >
-                                <Download className="mr-2 h-4 w-4" />
-                                Baixar Edital
-                              </DropdownMenuItem>
-                              <DropdownMenuItem
-                                onClick={(e) => {
-                                  e.stopPropagation()
-                                  handleShareLicitacao(licitacao)
-                                }}
-                              >
-                                <Share2 className="mr-2 h-4 w-4" />
-                                Compartilhar
-                              </DropdownMenuItem>
-                              <DropdownMenuSeparator />
-                              <DropdownMenuItem
-                                onClick={(e) => {
-                                  e.stopPropagation()
-                                  handleSendEmail(licitacao)
-                                }}
-                              >
-                                <Mail className="mr-2 h-4 w-4" />
-                                Enviar Email
-                              </DropdownMenuItem>
-                              <DropdownMenuItem
-                                onClick={(e) => {
-                                  e.stopPropagation()
-                                  handleScheduleCall(licitacao)
-                                }}
-                              >
-                                <Phone className="mr-2 h-4 w-4" />
-                                Agendar Ligau00e7u00e3o
-                              </DropdownMenuItem>
-                              <DropdownMenuSeparator />
-                              <DropdownMenuItem
-                                onClick={(e) => {
-                                  e.stopPropagation()
-                                  handleMarkAsWon(licitacao)
-                                }}
-                                disabled={licitacao.status === "Ganho"}
-                              >
-                                <CheckCircle className="mr-2 h-4 w-4 text-green-600" />
-                                Marcar como Ganho
-                              </DropdownMenuItem>
-                              <DropdownMenuItem
-                                onClick={(e) => {
-                                  e.stopPropagation()
-                                  handleMarkAsLost(licitacao)
-                                }}
-                                disabled={licitacao.status === "Perdido"}
-                              >
-                                <XCircle className="mr-2 h-4 w-4 text-red-600" />
-                                Marcar como Perdido
-                              </DropdownMenuItem>
-                            </DropdownMenuContent>
-                          </DropdownMenu>
+                    {loading ? (
+                      <tr>
+                        <td colSpan={7} className="p-4 text-center">
+                          Carregando licitações...
                         </td>
                       </tr>
-                    ))}
+                    ) : filteredLicitacoes.length === 0 ? (
+                      <tr>
+                        <td colSpan={7} className="p-4 text-center">
+                          Nenhuma licitação encontrada
+                        </td>
+                      </tr>
+                    ) : (
+                      filteredLicitacoes.map((licitacao) => (
+                        <tr
+                          key={licitacao.id}
+                          className="border-b cursor-pointer hover:bg-gray-50"
+                          onClick={() => handleLicitacaoClick(licitacao)}
+                        >
+                          <td className="p-4">{licitacao.titulo}</td>
+                          <td className="p-4">
+                            <Button
+                              variant="link"
+                              className="p-0 h-auto"
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                handleOrgaoClick(licitacao.orgao)
+                              }}
+                            >
+                              {licitacao.orgao}
+                            </Button>
+                          </td>
+                          <td className="p-4">{formatarValor(licitacao.valorEstimado)}</td>
+                          <td className="p-4">{licitacao.responsavel}</td>
+                          <td className="p-4">{licitacao.dataAbertura}</td>
+                          <td className="p-4">
+                            <StatusBadge status={licitacao.status} />
+                          </td>
+                          <td className="p-4">
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={(e) => {
+                                    e.stopPropagation()
+                                  }}
+                                >
+                                  <MoreHorizontal className="w-4 h-4" />
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end" className="w-56">
+                                <DropdownMenuLabel>Ações</DropdownMenuLabel>
+                                <DropdownMenuSeparator />
+                                <DropdownMenuItem
+                                  onClick={(e) => {
+                                    e.stopPropagation()
+                                    handleLicitacaoClick(licitacao)
+                                  }}
+                                >
+                                  <Edit className="mr-2 h-4 w-4" />
+                                  Editar
+                                </DropdownMenuItem>
+                                <DropdownMenuItem
+                                  onClick={(e) => {
+                                    e.stopPropagation()
+                                    handleDeleteLicitacao(licitacao.id)
+                                  }}
+                                  className="text-destructive"
+                                >
+                                  <Trash className="mr-2 h-4 w-4" />
+                                  Excluir
+                                </DropdownMenuItem>
+                                <DropdownMenuSeparator />
+                                <DropdownMenuItem
+                                  onClick={(e) => {
+                                    e.stopPropagation()
+                                    handleDownloadEdital(licitacao)
+                                  }}
+                                >
+                                  <Download className="mr-2 h-4 w-4" />
+                                  Baixar Edital
+                                </DropdownMenuItem>
+                                <DropdownMenuItem
+                                  onClick={(e) => {
+                                    e.stopPropagation()
+                                    handleShareLicitacao(licitacao)
+                                  }}
+                                >
+                                  <Share2 className="mr-2 h-4 w-4" />
+                                  Compartilhar
+                                </DropdownMenuItem>
+                                <DropdownMenuSeparator />
+                                <DropdownMenuItem
+                                  onClick={(e) => {
+                                    e.stopPropagation()
+                                    handleSendEmail(licitacao)
+                                  }}
+                                >
+                                  <Mail className="mr-2 h-4 w-4" />
+                                  Enviar Email
+                                </DropdownMenuItem>
+                                <DropdownMenuItem
+                                  onClick={(e) => {
+                                    e.stopPropagation()
+                                    handleScheduleCall(licitacao)
+                                  }}
+                                >
+                                  <Phone className="mr-2 h-4 w-4" />
+                                  Agendar Ligação
+                                </DropdownMenuItem>
+                                <DropdownMenuSeparator />
+                                <DropdownMenuItem
+                                  onClick={(e) => {
+                                    e.stopPropagation()
+                                    handleMarkAsWon(licitacao)
+                                  }}
+                                  disabled={licitacao.status === "vencida"}
+                                >
+                                  <CheckCircle className="mr-2 h-4 w-4 text-green-600" />
+                                  Marcar como Ganho
+                                </DropdownMenuItem>
+                                <DropdownMenuItem
+                                  onClick={(e) => {
+                                    e.stopPropagation()
+                                    handleMarkAsLost(licitacao)
+                                  }}
+                                  disabled={licitacao.status === "nao_vencida"}
+                                >
+                                  <XCircle className="mr-2 h-4 w-4 text-red-600" />
+                                  Marcar como Perdido
+                                </DropdownMenuItem>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                          </td>
+                        </tr>
+                      ))
+                    )}
                   </tbody>
                 </table>
               </div>
             </div>
           </TabsContent>
 
-          <TabsContent value="kanban">
+          {/* Visualização Kanban */}
+          <TabsContent value="kanban" className="mt-4">
             <div className="bg-white rounded-md border shadow-sm p-4">
               <h2 className="text-lg font-semibold mb-4">Kanban de Licitações</h2>
               <LicitacaoKanbanBoard
@@ -729,7 +649,7 @@ export default function LicitacoesPage() {
         </Tabs>
       </div>
 
-      {/* Modals/Drawers */}
+      {/* Modais de Detalhes */}
       {selectedLicitacao && detailsOpen ? (
         <DetalhesLicitacao
           key={`licitacao-${selectedLicitacao.id}`}
@@ -746,7 +666,7 @@ export default function LicitacoesPage() {
           onUpdateStatus={handleUpdateStatus}
           onOrgaoClick={handleOrgaoClick}
           onLicitacaoUpdate={handleLicitacaoUpdate}
-          onLicitacaoDelete={handleLicitacaoDelete}
+          onLicitacaoDelete={handleDeleteLicitacao}
         />
       ) : null}
 
@@ -769,7 +689,7 @@ export default function LicitacoesPage() {
       ) : null}
       
       {/* Diálogo de confirmação de exclusão */}
-      <Dialog open={showConfirmDelete} onOpenChange={setShowConfirmDelete}>
+      <Dialog open={dialogExcluirAberto} onOpenChange={setDialogExcluirAberto}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Confirmar exclusão</DialogTitle>
@@ -778,7 +698,7 @@ export default function LicitacoesPage() {
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowConfirmDelete(false)}>
+            <Button variant="outline" onClick={() => setDialogExcluirAberto(false)}>
               Cancelar
             </Button>
             <Button variant="destructive" onClick={confirmDeleteLicitacao}>

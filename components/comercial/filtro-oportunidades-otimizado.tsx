@@ -166,8 +166,8 @@ export function FiltroOportunidadesOtimizado({ onFilterChange, clientes, respons
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="todos">Todos os clientes</SelectItem>
-                {clientes.map((cliente) => (
-                  <SelectItem key={cliente} value={cliente}>
+                {clientes.map((cliente, index) => (
+                  <SelectItem key={`cliente-${cliente}-${index}`} value={cliente}>
                     {cliente}
                   </SelectItem>
                 ))}
@@ -187,8 +187,8 @@ export function FiltroOportunidadesOtimizado({ onFilterChange, clientes, respons
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="todos">Todos os responsáveis</SelectItem>
-                {responsaveis.map((responsavel) => (
-                  <SelectItem key={responsavel} value={responsavel}>
+                {responsaveis.map((responsavel, index) => (
+                  <SelectItem key={`responsavel-${responsavel}-${index}`} value={responsavel}>
                     {responsavel}
                   </SelectItem>
                 ))}

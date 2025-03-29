@@ -23,97 +23,50 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { toast } from "@/components/ui/use-toast"
-
-interface Oportunidade {
-  id: string
-  titulo: string
-  cliente: string
-  valor: string
-  responsavel: string
-  prazo: string
-  status: string
-  descricao?: string
-}
-
-interface Cliente {
-  nome: string
-  [key: string]: any
-}
+// Importações para os componentes de formulário
+import { Label } from "@/components/ui/label"
+import { Input } from "@/components/ui/input"
+import { Textarea } from "@/components/ui/textarea"
+// Importar os hooks do backend
+import { useOportunidades, useClientes, useResponsaveis } from "@/hooks/comercial"
+import { Oportunidade as OportunidadeTipo, Cliente as ClienteTipo, OportunidadeStatus } from "@/types/comercial"
+import { NovoCliente } from "@/components/comercial/novo-cliente"
+import { AgendarReuniao } from "@/components/comercial/agendar-reuniao"
+import { EditarOportunidade } from "@/components/comercial/editar-oportunidade"
 
 export default function ComercialPage() {
-  const [oportunidades, setOportunidades] = useState<Oportunidade[]>([
-    {
-      id: "1",
-      titulo: "Sistema de Gestão Municipal",
-      cliente: "Prefeitura de São Paulo",
-      valor: "R$ 450.000,00",
-      responsavel: "Ana Silva",
-      prazo: "30/06/2023",
-      status: "novo_lead",
-    },
-    {
-      id: "2",
-      titulo: "Plataforma de Educação Online",
-      cliente: "Secretaria de Educação",
-      valor: "R$ 280.000,00",
-      responsavel: "Carlos Oliveira",
-      prazo: "15/07/2023",
-      status: "agendamento_reuniao",
-    },
-    {
-      id: "3",
-      titulo: "Modernização de Infraestrutura",
-      cliente: "Hospital Municipal",
-      valor: "R$ 620.000,00",
-      responsavel: "Ana Silva",
-      prazo: "10/08/2023",
-      status: "levantamento_oportunidades",
-    },
-    {
-      id: "4",
-      titulo: "Sistema de Controle de Frotas",
-      cliente: "Departamento de Transportes",
-      valor: "R$ 180.000,00",
-      responsavel: "Pedro Santos",
-      prazo: "05/06/2023",
-      status: "proposta_enviada",
-    },
-    {
-      id: "5",
-      titulo: "Portal de Transparência",
-      cliente: "Governo do Estado",
-      valor: "R$ 320.000,00",
-      responsavel: "Carlos Oliveira",
-      prazo: "20/07/2023",
-      status: "negociacao",
-    },
-    {
-      id: "6",
-      titulo: "Aplicativo de Serviços Públicos",
-      cliente: "Prefeitura de Campinas",
-      valor: "R$ 250.000,00",
-      responsavel: "Pedro Santos",
-      prazo: "15/06/2023",
-      status: "fechado_ganho",
-    },
-    {
-      id: "7",
-      titulo: "Sistema de Gestão Hospitalar",
-      cliente: "Hospital Regional",
-      valor: "R$ 380.000,00",
-      responsavel: "Maria Souza",
-      prazo: "22/07/2023",
-      status: "fechado_perdido",
-    },
-  ])
+  // Usar os hooks do backend
+  const {
+    oportunidades,
+    isLoading: isLoadingOportunidades,
+    error: errorOportunidades,
+    fetchOportunidades,
+    getOportunidade,
+    createOportunidade,
+    updateOportunidade,
+    updateOportunidadeStatus,
+    deleteOportunidade,
+  } = useOportunidades();
 
-  const [filteredOportunidades, setFilteredOportunidades] = useState<Oportunidade[]>([])
-  const [searchTerm, setSearchTerm] = useState("")
-  const [statusFilter, setStatusFilter] = useState("todos")
-  const [responsavelFilter, setResponsavelFilter] = useState("todos")
+  const {
+    clientes,
+    isLoading: isLoadingClientes,
+    error: errorClientes,
+    getCliente,
+    createCliente,
+    fetchClientes,
+    setClientes, // Adicione essa linha
+  } = useClientes();
+
+  const {
+    responsaveis,
+    isLoading: isLoadingResponsaveis,
+  } = useResponsaveis();
+
+  const [filteredOportunidades, setFilteredOportunidades] = useState<OportunidadeTipo[]>([])
   const [activeTab, setActiveTab] = useState("lista")
-  const [selectedOportunidade, setSelectedOportunidade] = useState<Oportunidade | null>(null)
-  const [selectedCliente, setSelectedCliente] = useState<Cliente | null>(null)
+  const [selectedOportunidade, setSelectedOportunidade] = useState<OportunidadeTipo | null>(null)
+  const [selectedCliente, setSelectedCliente] = useState<ClienteTipo | null>(null)
   const [detailsOpen, setDetailsOpen] = useState(false)
   const [clienteDetailsOpen, setClienteDetailsOpen] = useState(false)
   const [activeFilters, setActiveFilters] = useState(0)
@@ -121,240 +74,352 @@ export default function ComercialPage() {
   const [showEditarOportunidade, setShowEditarOportunidade] = useState(false)
   const [showConfirmDelete, setShowConfirmDelete] = useState(false)
   const [oportunidadeToDelete, setOportunidadeToDelete] = useState<string | null>(null)
+  
+  // Estados para controlar modais das ações
+  const [showEmailModal, setShowEmailModal] = useState(false)
+  const [showCallModal, setShowCallModal] = useState(false)
+  const [showMeetingModal, setShowMeetingModal] = useState(false)
+  const [showEditarModal, setShowEditarModal] = useState(false)
+  const [tempOportunidade, setTempOportunidade] = useState<OportunidadeTipo | null>(null)
 
-  // Extrair listas de valores únicos para os filtros
-  const clientes = Array.from(new Set(oportunidades.map(item => item.cliente)))
-  const responsaveis = Array.from(new Set(oportunidades.map(item => item.responsavel)))
-
+  // Atualizar oportunidades filtradas quando as oportunidades mudarem
   useEffect(() => {
-    applyFilters()
-  }, [searchTerm, statusFilter, responsavelFilter, oportunidades])
+    setFilteredOportunidades(oportunidades);
+  }, [oportunidades]);
 
-  const applyFilters = () => {
-    let filtered = [...oportunidades]
-    let activeFilterCount = 0
+  // Carregar oportunidades e clientes na inicialização
+  useEffect(() => {
+    console.log("Carregando dados iniciais...");
+    fetchOportunidades();
+    fetchClientes();
+  }, []);
 
-    if (searchTerm) {
-      filtered = filtered.filter(
-        (item) =>
-          item.titulo.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          item.cliente.toLowerCase().includes(searchTerm.toLowerCase()),
-      )
-      activeFilterCount++
-    }
-
-    if (statusFilter !== "todos") {
-      filtered = filtered.filter((item) => item.status === statusFilter)
-      activeFilterCount++
-    }
-
-    if (responsavelFilter !== "todos") {
-      filtered = filtered.filter((item) => item.responsavel === responsavelFilter)
-      activeFilterCount++
-    }
-
-    setFilteredOportunidades(filtered)
-    setActiveFilters(activeFilterCount)
-  }
-
-  // Nova função para aplicar filtros otimizados
+  // Função para aplicar filtros otimizados
   const handleFilterChange = (filtros: OportunidadeFiltros) => {
-    let filtered = [...oportunidades]
-
-    // Filtro por termo
-    if (filtros.termo) {
-      filtered = filtered.filter(
-        (item) =>
-          item.titulo.toLowerCase().includes(filtros.termo.toLowerCase()) ||
-          item.cliente.toLowerCase().includes(filtros.termo.toLowerCase()),
-      )
-    }
-
-    // Filtro por status
-    if (filtros.status !== "todos") {
-      filtered = filtered.filter((item) => item.status === filtros.status)
-    }
-
-    // Filtro por cliente
-    if (filtros.cliente !== "todos") {
-      filtered = filtered.filter((item) => item.cliente === filtros.cliente)
-    }
-
-    // Filtro por responsável
-    if (filtros.responsavel !== "todos") {
-      filtered = filtered.filter((item) => item.responsavel === filtros.responsavel)
-    }
-
-    // Filtro por data de prazo - início
-    if (filtros.dataInicio) {
-      filtered = filtered.filter((item) => {
-        const dataPrazo = new Date(item.prazo.split('/').reverse().join('-'))
-        return dataPrazo >= filtros.dataInicio!
-      })
-    }
-
-    // Filtro por data de prazo - fim
-    if (filtros.dataFim) {
-      filtered = filtered.filter((item) => {
-        const dataPrazo = new Date(item.prazo.split('/').reverse().join('-'))
-        return dataPrazo <= filtros.dataFim!
-      })
-    }
-
-    // Filtro por valor mínimo
-    if (filtros.valorMinimo) {
-      const valorMinimoNumerico = parseFloat(filtros.valorMinimo.replace(/[^0-9,]/g, '').replace(',', '.'))
-      filtered = filtered.filter((item) => {
-        const valorNumerico = parseFloat(item.valor.replace(/[^0-9,]/g, '').replace(',', '.'))
-        return !isNaN(valorNumerico) && !isNaN(valorMinimoNumerico) && valorNumerico >= valorMinimoNumerico
-      })
-    }
-
-    // Filtro por valor máximo
-    if (filtros.valorMaximo) {
-      const valorMaximoNumerico = parseFloat(filtros.valorMaximo.replace(/[^0-9,]/g, '').replace(',', '.'))
-      filtered = filtered.filter((item) => {
-        const valorNumerico = parseFloat(item.valor.replace(/[^0-9,]/g, '').replace(',', '.'))
-        return !isNaN(valorNumerico) && !isNaN(valorMaximoNumerico) && valorNumerico <= valorMaximoNumerico
-      })
-    }
-
-    setFilteredOportunidades(filtered)
+    // Converter para o formato esperado pelo hook
+    const backendFiltros = {
+      termo: filtros.termo,
+      status: filtros.status,
+      cliente: filtros.cliente,
+      responsavel: filtros.responsavel,
+      dataInicio: filtros.dataInicio,
+      dataFim: filtros.dataFim,
+    };
     
-    // Atualizar os filtros antigos para manter compatibilidade
-    setSearchTerm(filtros.termo)
-    setStatusFilter(filtros.status)
-    setResponsavelFilter(filtros.responsavel)
-  }
+    // Usar a API para buscar com filtros
+    fetchOportunidades(backendFiltros);
+    
+    // Contar filtros ativos para exibição visual
+    let activeFilterCount = 0;
+    if (filtros.termo) activeFilterCount++;
+    if (filtros.status !== "todos") activeFilterCount++;
+    if (filtros.cliente !== "todos") activeFilterCount++;
+    if (filtros.responsavel !== "todos") activeFilterCount++;
+    if (filtros.dataInicio) activeFilterCount++;
+    if (filtros.dataFim) activeFilterCount++;
+    
+    setActiveFilters(activeFilterCount);
+  };
 
-  // Função para excluir uma oportunidade
-  const handleDeleteOportunidade = (id: string) => {
-    setOportunidadeToDelete(id)
-    setShowConfirmDelete(true)
-  }
+  // Função para lidar com a adição de uma nova oportunidade
+  const handleOportunidadeAdded = async (oportunidade: any) => {
+    try {
+      await createOportunidade(oportunidade);
+      setShowNovaOportunidade(false);
+      toast({
+        title: "Oportunidade criada",
+        description: "A oportunidade foi criada com sucesso.",
+      });
+    } catch (error) {
+      toast({
+        title: "Erro",
+        description: "Erro ao criar oportunidade. Tente novamente.",
+        variant: "destructive",
+      });
+    }
+  };
 
-  // Função para confirmar a exclusão
-  const confirmDeleteOportunidade = () => {
-    if (oportunidadeToDelete) {
-      setOportunidades(oportunidades.filter(item => item.id !== oportunidadeToDelete))
-      setFilteredOportunidades(filteredOportunidades.filter(item => item.id !== oportunidadeToDelete))
-      setShowConfirmDelete(false)
-      setOportunidadeToDelete(null)
+  // Função para lidar com a adição de um novo cliente
+  const handleClienteAdded = async (cliente: Partial<ClienteTipo>) => {
+    try {
+      await createCliente(cliente);
+      toast({
+        title: "Cliente criado",
+        description: "O cliente foi criado com sucesso.",
+      });
+      // Recarregar a lista de clientes após adicionar um novo
+      fetchClientes();
+    } catch (error) {
+      toast({
+        title: "Erro",
+        description: "Erro ao criar cliente. Tente novamente.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  // Função para lidar com a atualização de uma oportunidade
+  const handleOportunidadeUpdated = async (id: string, data: Partial<OportunidadeTipo>) => {
+    try {
+      const updated = await updateOportunidade(id, data);
+      setSelectedOportunidade(updated);
+      toast({
+        title: "Oportunidade atualizada",
+        description: "A oportunidade foi atualizada com sucesso.",
+      });
+    } catch (error) {
+      toast({
+        title: "Erro",
+        description: "Erro ao atualizar oportunidade. Tente novamente.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  // Função para lidar com a exclusão de uma oportunidade
+  const handleDeleteOportunidade = async () => {
+    if (!oportunidadeToDelete) return;
+
+    try {
+      await deleteOportunidade(oportunidadeToDelete);
+      setShowConfirmDelete(false);
+      setOportunidadeToDelete(null);
+      
+      if (selectedOportunidade?.id === oportunidadeToDelete) {
+        setSelectedOportunidade(null);
+        setDetailsOpen(false);
+      }
+      
       toast({
         title: "Oportunidade excluída",
         description: "A oportunidade foi excluída com sucesso.",
-      })
+      });
+    } catch (error) {
+      toast({
+        title: "Erro",
+        description: "Erro ao excluir oportunidade. Tente novamente.",
+        variant: "destructive",
+      });
     }
-  }
+  };
 
-  // Função para editar uma oportunidade
-  const handleEditOportunidade = (oportunidade: Oportunidade) => {
-    setSelectedOportunidade(oportunidade)
-    setShowEditarOportunidade(true)
-  }
+  // Função para atualizar o status de uma oportunidade (usado no Kanban)
+  const handleUpdateStatus = async (id: string, newStatus: OportunidadeStatus) => {
+    try {
+      await updateOportunidadeStatus(id, newStatus);
+    } catch (error) {
+      toast({
+        title: "Erro",
+        description: "Erro ao atualizar status da oportunidade. Tente novamente.",
+        variant: "destructive",
+      });
+    }
+  };
 
-  // Função para enviar email relacionado à oportunidade
-  const handleSendEmail = (oportunidade: Oportunidade) => {
-    // Simulação de envio de email
-    toast({
-      title: "Email agendado",
-      description: `Um email será enviado para o cliente ${oportunidade.cliente}.`,
-    })
-  }
+  // Função para abrir os detalhes de uma oportunidade
+  const handleOportunidadeClick = async (oportunidadeId: string) => {
+    try {
+      // Verificar primeiro se a oportunidade está no estado atual
+      let oportunidadeEncontrada = oportunidades.find((o) => o.id === oportunidadeId);
 
-  // Função para agendar ligação
-  const handleScheduleCall = (oportunidade: Oportunidade) => {
-    // Simulação de agendamento de ligação
-    toast({
-      title: "Ligação agendada",
-      description: `Uma ligação foi agendada para o cliente ${oportunidade.cliente}.`,
-    })
-  }
-
-  // Função para agendar reunião
-  const handleScheduleMeeting = (oportunidade: Oportunidade) => {
-    // Simulação de agendamento de reunião
-    toast({
-      title: "Reunião agendada",
-      description: `Uma reunião foi agendada com o cliente ${oportunidade.cliente}.`,
-    })
-  }
-
-  // Função para marcar como ganho
-  const handleMarkAsWon = (oportunidade: Oportunidade) => {
-    const updatedOportunidades = oportunidades.map(item => {
-      if (item.id === oportunidade.id) {
-        return { ...item, status: "fechado_ganho" }
+      // Se não encontrada no estado, tentar buscar na API
+      if (!oportunidadeEncontrada) {
+        try {
+          const fetchedOportunidade = await getOportunidade(oportunidadeId);
+          if (fetchedOportunidade) {
+            oportunidadeEncontrada = fetchedOportunidade;
+          }
+        } catch (error) {
+          console.error("Erro ao buscar oportunidade:", error);
+        }
       }
-      return item
-    })
-    setOportunidades(updatedOportunidades)
-    applyFilters()
-    toast({
-      title: "Oportunidade atualizada",
-      description: "A oportunidade foi marcada como ganha.",
-    })
-  }
 
-  // Função para marcar como perdido
-  const handleMarkAsLost = (oportunidade: Oportunidade) => {
-    const updatedOportunidades = oportunidades.map(item => {
-      if (item.id === oportunidade.id) {
-        return { ...item, status: "fechado_perdido" }
+      if (oportunidadeEncontrada) {
+        // Se algum outro detalhe já está aberto, fechar primeiro
+        if (clienteDetailsOpen) {
+          setClienteDetailsOpen(false);
+          
+          // Agendar a abertura dos detalhes da oportunidade após um curto delay
+          setTimeout(() => {
+            setSelectedOportunidade(oportunidadeEncontrada);
+            setDetailsOpen(true);
+          }, 300);
+        } else {
+          // Abrir diretamente os detalhes
+          setSelectedOportunidade(oportunidadeEncontrada);
+          setDetailsOpen(true);
+        }
+      } else {
+        console.error("Oportunidade não encontrada");
+        toast({
+          title: "Oportunidade não encontrada",
+          description: "Não foi possível encontrar os detalhes desta oportunidade.",
+          variant: "destructive"
+        });
       }
-      return item
-    })
-    setOportunidades(updatedOportunidades)
-    applyFilters()
+    } catch (error) {
+      console.error("Erro ao buscar oportunidade:", error);
+      toast({
+        title: "Erro",
+        description: "Ocorreu um erro ao buscar os detalhes da oportunidade.",
+        variant: "destructive"
+      });
+    }
+  };
+
+  // Função para visualizar detalhes do cliente
+  const handleClienteClick = async (clienteId: string) => {
+    try {
+      // Verificar primeiro se o cliente está no estado atual
+      let clienteEncontrado = clientes.find((c) => c.id === clienteId);
+      
+      // Se não encontrado no estado, tentar buscar na API
+      if (!clienteEncontrado) {
+        try {
+          const response = await fetch(`/api/comercial/clientes/${clienteId}`);
+          if (response.ok) {
+            clienteEncontrado = await response.json();
+          }
+        } catch (error) {
+          console.error("Erro ao buscar cliente por ID:", error);
+        }
+        
+        // Se ainda não encontrado, buscar na lista completa de clientes
+        if (!clienteEncontrado) {
+          try {
+            const response = await fetch("/api/comercial/clientes");
+            if (response.ok) {
+              const todosClientes = await response.json();
+              
+              // Tentar encontrar por ID ou nome
+              clienteEncontrado = todosClientes.find(
+                (c: ClienteTipo) => c.id === clienteId || c.nome === clienteId
+              );
+              
+              if (clienteEncontrado) {
+                // Atualizar o estado dos clientes com todos os clientes
+                setClientes(todosClientes);
+              }
+            }
+          } catch (error) {
+            console.error("Erro ao buscar lista completa de clientes:", error);
+          }
+        }
+      }
+      
+      // Se encontrou o cliente
+      if (clienteEncontrado) {
+        // Se algum modal de detalhes já está aberto, fechar antes de abrir o de cliente
+        if (detailsOpen || clienteDetailsOpen) {
+          // Fechar todos os detalhes abertos
+          setDetailsOpen(false);
+          setClienteDetailsOpen(false);
+          
+          // Agendar a abertura dos detalhes do cliente após um curto delay
+          setTimeout(() => {
+            setSelectedCliente(clienteEncontrado);
+            setClienteDetailsOpen(true);
+          }, 300);
+        } else {
+          // Abrir diretamente se nenhum detalhe estiver aberto
+          setSelectedCliente(clienteEncontrado);
+          setClienteDetailsOpen(true);
+        }
+      } else {
+        console.error("Cliente não encontrado");
+        toast({
+          title: "Cliente não encontrado",
+          description: "Não foi possível encontrar os detalhes deste cliente.",
+          variant: "destructive"
+        });
+      }
+    } catch (error) {
+      console.error("Erro ao buscar cliente:", error);
+      toast({
+        title: "Erro",
+        description: "Ocorreu um erro ao buscar os detalhes do cliente.",
+        variant: "destructive"
+      });
+    }
+  };
+
+  // Função para editar uma oportunidade (ainda não implementada corretamente)
+  const handleOportunidadeEditar = (oportunidade: OportunidadeTipo) => {
+    console.log("Editando oportunidade:", oportunidade);
+    
+    // Armazenar a oportunidade temporariamente e abrir o modal
+    setTempOportunidade(oportunidade);
+    setShowEditarModal(true);
+  };
+
+  // Função para enviar e-mail relacionado a uma oportunidade
+  const handleSendEmail = (oportunidade: OportunidadeTipo) => {
+    console.log("Enviando email para oportunidade:", oportunidade);
+    
+    // Armazenar a oportunidade temporariamente e abrir o modal
+    setTempOportunidade(oportunidade);
+    setShowEmailModal(true);
+    
+    // O toast será exibido após a ação no modal
+  };
+
+  // Função para agendar uma ligação
+  const handleScheduleCall = (oportunidade: OportunidadeTipo) => {
+    console.log("Agendando ligação para oportunidade:", oportunidade);
+    
+    // Armazenar a oportunidade temporariamente e abrir o modal
+    setTempOportunidade(oportunidade);
+    setShowCallModal(true);
+    
+    // O toast será exibido após a ação no modal
+  };
+
+  // Função para agendar uma reunião
+  const handleScheduleMeeting = (oportunidade: OportunidadeTipo) => {
+    console.log("Agendando reunião para oportunidade:", oportunidade);
+    
+    // Armazenar a oportunidade temporariamente e abrir o modal
+    setTempOportunidade(oportunidade);
+    setShowMeetingModal(true);
+  };
+
+  // Função para atualizar cliente
+  const handleClienteUpdate = (cliente: ClienteTipo) => {
+    console.log("Atualizando cliente:", cliente);
+    // Implementar atualização do cliente
     toast({
-      title: "Oportunidade atualizada",
-      description: "A oportunidade foi marcada como perdida.",
-      variant: "destructive"
-    })
+      title: "Cliente atualizado",
+      description: "O cliente foi atualizado com sucesso."
+    });
+  };
+
+  // Função para excluir cliente
+  const handleClienteDelete = (cliente: ClienteTipo) => {
+    console.log("Excluindo cliente:", cliente);
+    // Implementar exclusão do cliente
+    toast({
+      title: "Cliente excluído",
+      description: "O cliente foi excluído com sucesso."
+    });
+  };
+
+  // Renderização condicional para estado de carregamento
+  if (isLoadingOportunidades && oportunidades.length === 0) {
+    return <div className="flex justify-center items-center h-[calc(100vh-200px)]">Carregando oportunidades...</div>;
   }
 
-  const handleClienteClick = (clienteNome: string) => {
-    if (!clienteDetailsOpen) {
-      setSelectedCliente({ nome: clienteNome })
-      setTimeout(() => {
-        setClienteDetailsOpen(true)
-      }, 0)
-    }
-  }
-
-  const handleUpdateStatus = (id: string, newStatus: string) => {
-    setOportunidades((prevOportunidades) =>
-      prevOportunidades.map((op) => (op.id === id ? { ...op, status: newStatus } : op)),
-    )
-  }
-
-  const handleClienteUpdate = (clienteAtualizado: Cliente) => {
-    // In a real app, this would update the client in the database
-    console.log("Cliente atualizado:", clienteAtualizado)
-    
-    // Update the oportunidades list with the new client name if it changed
-    if (clienteAtualizado.nome !== selectedCliente?.nome) {
-      setOportunidades(prev => 
-        prev.map(op => 
-          op.cliente === selectedCliente?.nome 
-            ? { ...op, cliente: clienteAtualizado.nome } 
-            : op
-        )
-      )
-    }
-    
-    // Update the selected client
-    setSelectedCliente(clienteAtualizado)
-  }
-
-  const handleClienteDelete = (cliente: Cliente) => {
-    // In a real app, this would delete the client from the database
-    console.log("Cliente excluído:", cliente)
-    
-    // Remove opportunities related to this client
-    setOportunidades(prev => 
-      prev.filter(op => op.cliente !== cliente.nome)
-    )
+  // Renderização condicional para erros
+  if (errorOportunidades) {
+    return (
+      <div className="flex justify-center items-center h-[calc(100vh-200px)]">
+        <div className="text-center">
+          <AlertTriangle className="mx-auto h-12 w-12 text-red-500 mb-4" />
+          <h3 className="text-lg font-medium">Erro ao carregar oportunidades</h3>
+          <p className="text-sm text-gray-500 mt-2">{errorOportunidades}</p>
+          <Button onClick={() => fetchOportunidades()} className="mt-4">Tentar novamente</Button>
+        </div>
+      </div>
+    );
   }
 
   return (
@@ -425,12 +490,17 @@ export default function ComercialPage() {
             <div className="flex items-center space-x-2">
               <FiltroOportunidadesOtimizado
                 onFilterChange={handleFilterChange}
-                clientes={clientes}
-                responsaveis={responsaveis}
+                clientes={clientes.map(c => c.nome)}
+                responsaveis={responsaveis.map(r => r.nome)}
+              />
+              <NovoCliente 
+                onClienteAdded={(novoCliente) => {
+                  handleClienteAdded(novoCliente)
+                }}
               />
               <NovaOportunidade
                 onOportunidadeAdded={(novaOportunidade) => {
-                  setOportunidades((prev) => [novaOportunidade, ...prev])
+                  handleOportunidadeAdded(novaOportunidade)
                 }}
               />
             </div>
@@ -462,8 +532,7 @@ export default function ComercialPage() {
                         key={oportunidade.id}
                         className="border-b cursor-pointer hover:bg-gray-50"
                         onClick={() => {
-                          setSelectedOportunidade(oportunidade)
-                          setDetailsOpen(true)
+                          handleOportunidadeClick(oportunidade.id)
                         }}
                       >
                         <td className="p-4">{oportunidade.titulo}</td>
@@ -504,23 +573,12 @@ export default function ComercialPage() {
                               <DropdownMenuItem
                                 onClick={(e) => {
                                   e.stopPropagation()
-                                  handleEditOportunidade(oportunidade)
+                                  handleOportunidadeEditar(oportunidade)
                                 }}
                               >
                                 <Edit className="mr-2 h-4 w-4" />
                                 Editar
                               </DropdownMenuItem>
-                              <DropdownMenuItem
-                                onClick={(e) => {
-                                  e.stopPropagation()
-                                  handleDeleteOportunidade(oportunidade.id)
-                                }}
-                                className="text-destructive"
-                              >
-                                <Trash className="mr-2 h-4 w-4" />
-                                Excluir
-                              </DropdownMenuItem>
-                              <DropdownMenuSeparator />
                               <DropdownMenuItem
                                 onClick={(e) => {
                                   e.stopPropagation()
@@ -552,7 +610,19 @@ export default function ComercialPage() {
                               <DropdownMenuItem
                                 onClick={(e) => {
                                   e.stopPropagation()
-                                  handleMarkAsWon(oportunidade)
+                                  setOportunidadeToDelete(oportunidade.id)
+                                  setShowConfirmDelete(true)
+                                }}
+                                className="text-destructive"
+                              >
+                                <Trash className="mr-2 h-4 w-4" />
+                                Excluir
+                              </DropdownMenuItem>
+                              <DropdownMenuSeparator />
+                              <DropdownMenuItem
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  handleUpdateStatus(oportunidade.id, "fechado_ganho")
                                 }}
                                 disabled={oportunidade.status === "fechado_ganho"}
                               >
@@ -562,7 +632,7 @@ export default function ComercialPage() {
                               <DropdownMenuItem
                                 onClick={(e) => {
                                   e.stopPropagation()
-                                  handleMarkAsLost(oportunidade)
+                                  handleUpdateStatus(oportunidade.id, "fechado_perdido")
                                 }}
                                 disabled={oportunidade.status === "fechado_perdido"}
                               >
@@ -583,14 +653,20 @@ export default function ComercialPage() {
           <TabsContent value="kanban">
             <div className="bg-white rounded-md border shadow-sm p-4">
               <h2 className="text-lg font-semibold mb-4">Kanban de Oportunidades</h2>
-              <KanbanBoard oportunidades={filteredOportunidades} onUpdateStatus={handleUpdateStatus} />
+              <KanbanBoard 
+                oportunidades={filteredOportunidades} 
+                onUpdateStatus={(id: string, newStatus: string) => {
+                  // Convert string to OportunidadeStatus
+                  handleUpdateStatus(id, newStatus as OportunidadeStatus);
+                }} 
+              />
             </div>
           </TabsContent>
         </Tabs>
       </div>
 
-      {/* Modals/Drawers */}
-      {selectedOportunidade && detailsOpen ? (
+      {/* Modais/Drawers */}
+      {selectedOportunidade && (
         <DetalhesOportunidade
           key={`opp-${selectedOportunidade.id}`}
           oportunidade={selectedOportunidade}
@@ -603,27 +679,186 @@ export default function ComercialPage() {
               }, 300)
             }
           }}
-          onClienteClick={handleClienteClick}
+          onClienteClick={(clienteNome) => {
+            setDetailsOpen(false);
+            setTimeout(() => {
+              handleClienteClick(clienteNome);
+            }, 300);
+          }}
         />
-      ) : null}
+      )}
 
-      {selectedCliente && clienteDetailsOpen ? (
+      {selectedCliente && (
         <DetalhesCliente
-          key={`client-${selectedCliente.nome}`}
           cliente={selectedCliente}
           open={clienteDetailsOpen}
-          onOpenChange={(open) => {
-            setClienteDetailsOpen(open)
-            if (!open) {
-              setTimeout(() => {
-                setSelectedCliente(null)
-              }, 300)
-            }
-          }}
+          onOpenChange={setClienteDetailsOpen}
           onClienteUpdate={handleClienteUpdate}
           onClienteDelete={handleClienteDelete}
+          onOportunidadeClick={(oportunidade) => handleOportunidadeClick(oportunidade.id)}
         />
-      ) : null}
+      )}
+
+      {/* Modal de Envio de Email */}
+      {tempOportunidade && showEmailModal && (
+        <Dialog open={showEmailModal} onOpenChange={setShowEmailModal}>
+          <DialogContent className="max-w-xl max-h-[90vh] overflow-auto">
+            <DialogHeader>
+              <DialogTitle>Enviar Email</DialogTitle>
+              <DialogDescription>
+                Envie um email para o cliente relacionado a esta oportunidade.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="grid gap-4 py-4">
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="emailTo" className="text-right sm:text-left col-span-4 sm:col-span-1">
+                  Para
+                </Label>
+                <Input
+                  id="emailTo"
+                  defaultValue={tempOportunidade.cliente}
+                  className="col-span-4 sm:col-span-3"
+                  readOnly
+                />
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="emailSubject" className="text-right sm:text-left col-span-4 sm:col-span-1">
+                  Assunto
+                </Label>
+                <Input
+                  id="emailSubject"
+                  defaultValue={`Proposta: ${tempOportunidade.titulo}`}
+                  className="col-span-4 sm:col-span-3"
+                />
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="emailBody" className="text-right sm:text-left col-span-4 sm:col-span-1">
+                  Mensagem
+                </Label>
+                <Textarea
+                  id="emailBody"
+                  placeholder="Digite sua mensagem aqui..."
+                  className="col-span-4 sm:col-span-3"
+                  rows={6}
+                />
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setShowEmailModal(false)}>
+                Cancelar
+              </Button>
+              <Button onClick={() => {
+                toast({
+                  title: "Email enviado",
+                  description: `Email enviado para ${tempOportunidade.cliente}`,
+                });
+                setShowEmailModal(false);
+              }}>
+                Enviar Email
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      )}
+
+      {/* Modal de Agendamento de Ligação */}
+      {tempOportunidade && showCallModal && (
+        <Dialog open={showCallModal} onOpenChange={setShowCallModal}>
+          <DialogContent className="max-w-xl max-h-[90vh] overflow-auto">
+            <DialogHeader>
+              <DialogTitle>Agendar Ligação</DialogTitle>
+              <DialogDescription>
+                Agende uma ligação para o cliente relacionado a esta oportunidade.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="grid gap-4 py-4">
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="callContact" className="text-right sm:text-left col-span-4 sm:col-span-1">
+                  Contato
+                </Label>
+                <Input
+                  id="callContact"
+                  defaultValue={tempOportunidade.cliente}
+                  className="col-span-4 sm:col-span-3"
+                />
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="callDate" className="text-right sm:text-left col-span-4 sm:col-span-1">
+                  Data
+                </Label>
+                <Input
+                  id="callDate"
+                  type="date"
+                  defaultValue={new Date().toISOString().split('T')[0]}
+                  className="col-span-4 sm:col-span-3"
+                />
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="callTime" className="text-right sm:text-left col-span-4 sm:col-span-1">
+                  Hora
+                </Label>
+                <Input
+                  id="callTime"
+                  type="time"
+                  defaultValue="10:00"
+                  className="col-span-4 sm:col-span-3"
+                />
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="callNotes" className="text-right sm:text-left col-span-4 sm:col-span-1">
+                  Anotações
+                </Label>
+                <Textarea
+                  id="callNotes"
+                  placeholder="Tópicos a serem discutidos..."
+                  className="col-span-4 sm:col-span-3"
+                  rows={3}
+                />
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setShowCallModal(false)}>
+                Cancelar
+              </Button>
+              <Button onClick={() => {
+                toast({
+                  title: "Ligação agendada",
+                  description: `Ligação agendada para ${tempOportunidade.cliente}`,
+                });
+                setShowCallModal(false);
+              }}>
+                Agendar
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      )}
+
+      {/* Modal de Agendamento de Reunião usando o componente AgendarReuniao */}
+      {tempOportunidade && showMeetingModal && (
+        <AgendarReuniao
+          open={showMeetingModal}
+          onOpenChange={setShowMeetingModal}
+          oportunidade={tempOportunidade}
+          onReuniaoAgendada={(reuniao) => {
+            console.log("Reunião agendada:", reuniao);
+            // Aqui você pode atualizar o estado da aplicação se necessário
+            // Por exemplo, adicionar a reunião a uma lista de reuniões
+          }}
+        />
+      )}
+
+      {/* Modal de Edição de Oportunidade */}
+      {tempOportunidade && showEditarModal && (
+        <EditarOportunidade
+          open={showEditarModal}
+          onOpenChange={setShowEditarModal}
+          oportunidade={tempOportunidade}
+          onOportunidadeUpdated={handleOportunidadeUpdated}
+          clientes={clientes.map(c => c.nome)}
+          responsaveis={responsaveis.map(r => r.nome)}
+        />
+      )}
 
       {/* Diálogo de confirmação de exclusão */}
       <Dialog open={showConfirmDelete} onOpenChange={setShowConfirmDelete}>
@@ -638,7 +873,7 @@ export default function ComercialPage() {
             <Button variant="outline" onClick={() => setShowConfirmDelete(false)}>
               Cancelar
             </Button>
-            <Button variant="destructive" onClick={confirmDeleteOportunidade}>
+            <Button variant="destructive" onClick={handleDeleteOportunidade}>
               Excluir
             </Button>
           </DialogFooter>
@@ -648,8 +883,8 @@ export default function ComercialPage() {
   )
 }
 
-function StatusBadge({ status }: { status: string }) {
-  const statusConfig: Record<string, { label: string; class: string }> = {
+function StatusBadge({ status }: { status: OportunidadeStatus }) {
+  const statusConfig: Record<OportunidadeStatus, { label: string; class: string }> = {
     novo_lead: { label: "Novo Lead", class: "bg-blue-100 text-blue-800 rounded-full px-3 py-1 text-xs" },
     agendamento_reuniao: {
       label: "Agendamento de Reunião",
@@ -676,8 +911,8 @@ function StatusBadge({ status }: { status: string }) {
   return <span className={config.class}>{config.label}</span>
 }
 
-function getStatusLabel(status: string): string {
-  const statusLabels: Record<string, string> = {
+function getStatusLabel(status: OportunidadeStatus): string {
+  const statusLabels: Record<OportunidadeStatus, string> = {
     novo_lead: "Novo Lead",
     agendamento_reuniao: "Agendamento de Reunião",
     levantamento_oportunidades: "Levantamento de Oportunidades",

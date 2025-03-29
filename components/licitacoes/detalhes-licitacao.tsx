@@ -27,6 +27,8 @@ import {
   AlertTriangle,
   BadgeDollarSign,
   Plus,
+  Maximize2,
+  Minimize2,
 } from "lucide-react"
 import { toast } from "sonner"
 import {
@@ -60,6 +62,8 @@ interface Licitacao {
   descricao?: string
   forma_pagamento?: string
   obs_financeiras?: string
+  tipo?: "produto" | "servico"
+  tipoFaturamento?: "direto" | "distribuidor"
 }
 
 export type { Licitacao }
@@ -117,6 +121,7 @@ export function DetalhesLicitacao({
   const [isEditing, setIsEditing] = useState(false)
   const [formData, setFormData] = useState<Partial<Licitacao>>({})
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
+  const [isExpanded, setIsExpanded] = useState(false)
 
   const servicosOferecidos = [
     {
@@ -227,9 +232,24 @@ export function DetalhesLicitacao({
 
   return (
     <Sheet key={`licitacao-sheet-${licitacao?.id || "empty"}`} open={open} onOpenChange={onOpenChange}>
-      <SheetContent className="w-full md:max-w-xl lg:max-w-2xl overflow-y-auto">
+      <SheetContent 
+        className={`overflow-y-auto transition-all duration-300 ${
+          isExpanded ? "w-[95vw] max-w-[95vw]" : "w-full md:max-w-3xl lg:max-w-4xl"
+        }`}
+      >
         <SheetHeader className="mb-6">
-          <SheetTitle className="text-xl">{formData.titulo || "Licitação"}</SheetTitle>
+          <div className="flex justify-between items-center">
+            <SheetTitle className="text-xl">{formData.titulo || "Licitação"}</SheetTitle>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => setIsExpanded(!isExpanded)}
+              className="h-8 w-8 rounded-full"
+              title={isExpanded ? "Recolher painel" : "Expandir painel"}
+            >
+              {isExpanded ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
+            </Button>
+          </div>
           <div className="text-sm text-muted-foreground">
             <div className="flex items-center gap-2 mt-2">
               <Button
@@ -319,56 +339,115 @@ export function DetalhesLicitacao({
                       )}
                     </div>
 
-                    <div className="space-y-4 mt-4">
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div>
-                          <Label htmlFor="edital">Número do Edital</Label>
-                          <Input
-                            id="edital"
-                            value={formData.edital || ""}
-                            onChange={(e) =>
-                              setFormData({ ...formData, edital: e.target.value })
-                            }
-                            disabled={!isEditing}
-                          />
+                    <div>
+                      <Label>Tipo da Licitação</Label>
+                      {isEditing ? (
+                        <div className="mt-1">
+                          <Select
+                            value={formData.tipo || ""}
+                            onValueChange={(value: "produto" | "servico") => {
+                              const newFormData = { ...formData, tipo: value };
+                              // Se mudar de produto para serviço, limpar tipoFaturamento
+                              if (value !== "produto") {
+                                newFormData.tipoFaturamento = undefined;
+                              }
+                              setFormData(newFormData);
+                            }}
+                          >
+                            <SelectTrigger>
+                              <SelectValue placeholder="Selecione o tipo" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="produto">Produto</SelectItem>
+                              <SelectItem value="servico">Serviço</SelectItem>
+                            </SelectContent>
+                          </Select>
                         </div>
-                        <div>
-                          <Label htmlFor="dataAbertura">Data de Abertura</Label>
-                          <Input
-                            id="dataAbertura"
-                            type="date"
-                            value={formData.dataAbertura || ""}
-                            onChange={(e) =>
-                              setFormData({ ...formData, dataAbertura: e.target.value })
-                            }
-                            disabled={!isEditing}
-                          />
-                        </div>
-                        <div>
-                          <Label htmlFor="editalUrl">URL do Edital</Label>
-                          <Input
-                            id="editalUrl"
-                            value={formData.edital || ""}
-                            onChange={(e) =>
-                              setFormData({ ...formData, edital: e.target.value })
-                            }
-                            disabled={!isEditing}
-                          />
-                        </div>
-                      </div>
+                      ) : (
+                        <p className="text-sm mt-1">
+                          {formData.tipo === "produto" ? "Produto" : 
+                           formData.tipo === "servico" ? "Serviço" : 
+                           "Não especificado"}
+                        </p>
+                      )}
+                    </div>
 
+                    {(isEditing && formData.tipo === "produto") || (!isEditing && formData.tipo === "produto") ? (
                       <div>
-                        <Label htmlFor="objeto">Objeto</Label>
-                        <Textarea
-                          id="objeto"
-                          value={formData.objeto || ""}
-                          onChange={(e) =>
-                            setFormData({ ...formData, objeto: e.target.value })
-                          }
-                          className="min-h-[100px]"
-                          disabled={!isEditing}
-                        />
+                        <Label>Tipo de Faturamento</Label>
+                        {isEditing ? (
+                          <div className="mt-1">
+                            <Select
+                              value={formData.tipoFaturamento || ""}
+                              onValueChange={(value: "direto" | "distribuidor") => 
+                                setFormData({ ...formData, tipoFaturamento: value })
+                              }
+                            >
+                              <SelectTrigger>
+                                <SelectValue placeholder="Selecione o tipo de faturamento" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="direto">Direto</SelectItem>
+                                <SelectItem value="distribuidor">Via Distribuidor</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+                        ) : (
+                          <p className="text-sm mt-1">
+                            {formData.tipoFaturamento === "direto" ? "Direto" : 
+                             formData.tipoFaturamento === "distribuidor" ? "Via Distribuidor" : 
+                             "Não especificado"}
+                          </p>
+                        )}
                       </div>
+                    ) : null}
+
+                    <div>
+                      <Label htmlFor="edital">Número do Edital</Label>
+                      <Input
+                        id="edital"
+                        value={formData.edital || ""}
+                        onChange={(e) =>
+                          setFormData({ ...formData, edital: e.target.value })
+                        }
+                        disabled={!isEditing}
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="dataAbertura">Data de Abertura</Label>
+                      <Input
+                        id="dataAbertura"
+                        type="date"
+                        value={formData.dataAbertura || ""}
+                        onChange={(e) =>
+                          setFormData({ ...formData, dataAbertura: e.target.value })
+                        }
+                        disabled={!isEditing}
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="editalUrl">URL do Edital</Label>
+                      <Input
+                        id="editalUrl"
+                        value={formData.edital || ""}
+                        onChange={(e) =>
+                          setFormData({ ...formData, edital: e.target.value })
+                        }
+                        disabled={!isEditing}
+                      />
+                    </div>
+
+                    <div>
+                      <Label htmlFor="objeto">Objeto</Label>
+                      <Textarea
+                        id="objeto"
+                        value={formData.objeto || ""}
+                        onChange={(e) =>
+                          setFormData({ ...formData, objeto: e.target.value })
+                        }
+                        className="min-h-[100px]"
+                        disabled={!isEditing}
+                      />
                     </div>
                   </div>
                 </div>

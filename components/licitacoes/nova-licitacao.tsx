@@ -50,6 +50,8 @@ export function NovaLicitacao({ onLicitacaoAdded }: NovaLicitacaoProps) {
     contatoEmail: "",
     urlLicitacao: "",
     status: "analise_interna",
+    tipo: "", // Produto ou Serviço
+    tipoFaturamento: "", // Direto ou Distribuidor (apenas para Produto)
   })
 
   // Estados para datas
@@ -136,63 +138,98 @@ export function NovaLicitacao({ onLicitacaoAdded }: NovaLicitacaoProps) {
     return valorProposta * (1 + totalImpostos)
   }
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     // Validar campos obrigatórios
-    if (!formData.nome || !formData.orgao || !prazoEnvio || !dataJulgamento) {
+    if (!formData.nome || !formData.orgao || !prazoEnvio || !dataJulgamento || !formData.tipo) {
       alert("Por favor, preencha todos os campos obrigatórios.")
+      return
+    }
+
+    if(formData.tipo === "produto" && !formData.tipoFaturamento) {
+      alert("Por favor, selecione o tipo de faturamento.")
       return
     }
 
     setIsSubmitting(true)
 
-    // Criar objeto de licitação
-    const novaLicitacao = {
-      id: `lic-${Date.now()}`,
-      nome: formData.nome,
-      orgao: formData.orgao,
-      orgaoId: formData.orgao.toLowerCase().replace(/\s/g, "_"),
-      valor: formData.valorProposta ? `R$ ${formData.valorProposta}` : "A definir",
-      prazo: prazoEnvio ? format(prazoEnvio, "dd/MM/yyyy", { locale: ptBR }) : "",
-      prazoStatus: "warning",
-      status: formData.status,
-      documentos: documentosNecessarios.filter((d) => d.selecionado).length,
-      responsaveis: responsaveis.filter((r) => r.selecionado).length,
-      dataJulgamento: dataJulgamento ? format(dataJulgamento, "dd/MM/yyyy", { locale: ptBR }) : "",
-      // Dados adicionais
-      descricao: formData.descricao,
-      numeroEdital: formData.numeroEdital,
-      modalidade: formData.modalidade,
-      dataPublicacao: dataPublicacao ? format(dataPublicacao, "dd/MM/yyyy", { locale: ptBR }) : "",
-      valorEstimado: formData.valorEstimado,
-      margemLucro: formData.margemLucro,
-      contatoNome: formData.contatoNome,
-      contatoTelefone: formData.contatoTelefone,
-      contatoEmail: formData.contatoEmail,
-      urlLicitacao: formData.urlLicitacao,
-      documentosNecessarios: documentosNecessarios.filter((d) => d.selecionado),
-      responsaveisIds: responsaveis.filter((r) => r.selecionado).map((r) => r.id),
-      criarEvento,
-      enviarNotificacoes,
-    }
-
-    // Simular envio para API
-    setTimeout(() => {
-      setIsSubmitting(false)
-
-      // Notificar componente pai
-      if (onLicitacaoAdded) {
-        onLicitacaoAdded(novaLicitacao)
+    try {
+      // Preparar os dados conforme o tipo Licitacao da nossa API
+      const licitacaoData = {
+        titulo: formData.nome,
+        orgao: formData.orgao,
+        orgaoId: formData.orgao.toLowerCase().replace(/\s/g, "_"),
+        status: formData.status,
+        dataAbertura: prazoEnvio ? format(prazoEnvio, "yyyy-MM-dd") : undefined,
+        dataPublicacao: dataPublicacao ? format(dataPublicacao, "yyyy-MM-dd") : undefined,
+        valorEstimado: formData.valorEstimado ? Number(formData.valorEstimado.replace(/[^\d,]/g, "").replace(",", ".")) : 0,
+        valorProposta: formData.valorProposta ? Number(formData.valorProposta.replace(/[^\d,]/g, "").replace(",", ".")) : undefined,
+        modalidade: formData.modalidade,
+        objeto: formData.descricao,
+        edital: formData.numeroEdital,
+        numeroEdital: formData.numeroEdital,
+        responsavel: responsaveis.find(r => r.selecionado)?.nome || "Não atribuído",
+        responsavelId: responsaveis.find(r => r.selecionado)?.id,
+        responsaveisIds: responsaveis.filter(r => r.selecionado).map(r => r.id),
+        prazo: prazoEnvio ? format(prazoEnvio, "dd/MM/yyyy") : "",
+        urlLicitacao: formData.urlLicitacao,
+        descricao: formData.descricao,
+        formaPagamento: "",
+        obsFinanceiras: "",
+        tipo: formData.tipo,
+        tipoFaturamento: formData.tipoFaturamento,
+        margemLucro: formData.margemLucro ? Number(formData.margemLucro) : undefined,
+        contatoNome: formData.contatoNome,
+        contatoEmail: formData.contatoEmail,
+        contatoTelefone: formData.contatoTelefone,
+        dataJulgamento: dataJulgamento ? format(dataJulgamento, "yyyy-MM-dd") : undefined,
+        // Informações adicionais que podem ser úteis para o front-end mas não são necessariamente parte da API
+        documentosNecessarios: documentosNecessarios.filter(d => d.selecionado).map(doc => ({
+          id: doc.id,
+          nome: doc.nome,
+          tipo: "documento",
+          url: "",
+          licitacaoId: "",
+          dataCriacao: new Date().toISOString(),
+          dataAtualizacao: new Date().toISOString(),
+        }))
       }
 
-      // Criar evento no calendário (simulação)
+      // Chamada à API
+      const response = await fetch('/api/licitacoes', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(licitacaoData),
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.error || 'Erro ao criar licitação')
+      }
+
+      const novaLicitacao = await response.json()
+
+      // Se tiver arquivos anexados, poderia enviar em outro endpoint
+      if (arquivosAnexados.length > 0) {
+        console.log(`${arquivosAnexados.length} arquivos seriam enviados para a API de upload`)
+        // Aqui implementaríamos o upload de arquivos em uma situação real
+      }
+
+      // Criar evento no calendário (simulação ou integração real)
       if (criarEvento && prazoEnvio) {
         console.log(`Evento criado no calendário para ${format(prazoEnvio, "dd/MM/yyyy", { locale: ptBR })}`)
       }
 
-      // Enviar notificações (simulação)
+      // Enviar notificações (simulação ou integração real)
       if (enviarNotificacoes) {
-        const responsaveisSelecionados = responsaveis.filter((r) => r.selecionado)
+        const responsaveisSelecionados = responsaveis.filter(r => r.selecionado)
         console.log(`Notificações enviadas para ${responsaveisSelecionados.length} responsáveis`)
+      }
+
+      // Notificar componente pai
+      if (onLicitacaoAdded) {
+        onLicitacaoAdded(novaLicitacao)
       }
 
       // Resetar formulário
@@ -210,12 +247,14 @@ export function NovaLicitacao({ onLicitacaoAdded }: NovaLicitacaoProps) {
         contatoEmail: "",
         urlLicitacao: "",
         status: "analise_interna",
+        tipo: "",
+        tipoFaturamento: "",
       })
       setDataPublicacao(undefined)
       setPrazoEnvio(undefined)
       setDataJulgamento(undefined)
-      setDocumentosNecessarios(documentosNecessarios.map((doc) => ({ ...doc, selecionado: false })))
-      setResponsaveis(responsaveis.map((resp) => ({ ...resp, selecionado: false })))
+      setDocumentosNecessarios(documentosNecessarios.map(doc => ({ ...doc, selecionado: false })))
+      setResponsaveis(responsaveis.map(resp => ({ ...resp, selecionado: false })))
       setArquivosAnexados([])
       setCriarEvento(true)
       setEnviarNotificacoes(true)
@@ -223,7 +262,12 @@ export function NovaLicitacao({ onLicitacaoAdded }: NovaLicitacaoProps) {
 
       // Fechar o diálogo
       setOpen(false)
-    }, 1500)
+    } catch (error) {
+      console.error('Erro ao criar licitação:', error)
+      alert(`Erro ao criar licitação: ${error instanceof Error ? error.message : 'Erro desconhecido'}`)
+    } finally {
+      setIsSubmitting(false)
+    }
   }
 
   return (
@@ -413,6 +457,43 @@ export function NovaLicitacao({ onLicitacaoAdded }: NovaLicitacaoProps) {
                   onChange={handleInputChange}
                 />
               </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4 mt-4">
+              <div className="space-y-2">
+                <Label htmlFor="tipo">
+                  Tipo de Licitação <span className="text-red-500">*</span>
+                </Label>
+                <Select value={formData.tipo} onValueChange={(value) => handleSelectChange("tipo", value)}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecione o tipo" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="produto">Produto</SelectItem>
+                    <SelectItem value="servico">Serviço</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {formData.tipo === "produto" && (
+                <div className="space-y-2">
+                  <Label htmlFor="tipoFaturamento">
+                    Tipo de Faturamento <span className="text-red-500">*</span>
+                  </Label>
+                  <Select 
+                    value={formData.tipoFaturamento} 
+                    onValueChange={(value) => handleSelectChange("tipoFaturamento", value)}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Selecione o tipo de faturamento" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="direto">Faturamento Direto</SelectItem>
+                      <SelectItem value="distribuidor">Via Distribuidor</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
             </div>
           </TabsContent>
 
@@ -661,4 +742,3 @@ export function NovaLicitacao({ onLicitacaoAdded }: NovaLicitacaoProps) {
     </Dialog>
   )
 }
-

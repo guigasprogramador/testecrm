@@ -22,6 +22,10 @@ import {
   MessageSquare,
   Edit,
   Save,
+  ChevronLeft,
+  ChevronRight,
+  Maximize2,
+  Minimize2
 } from "lucide-react"
 import Link from "next/link"
 
@@ -35,6 +39,8 @@ interface Oportunidade {
   status: string
   descricao?: string
   dataAgenda?: string
+  tipo?: "produto" | "servico"
+  tipoFaturamento?: "direto" | "distribuidor"
 }
 
 interface DetalhesOportunidadeProps {
@@ -79,6 +85,7 @@ export function DetalhesOportunidade({ oportunidade, open, onOpenChange, onClien
   const [novaNota, setNovaNota] = useState("")
   const [isEditing, setIsEditing] = useState(false)
   const [formData, setFormData] = useState<Partial<Oportunidade>>({})
+  const [isExpanded, setIsExpanded] = useState(false)
 
   // Dados fictícios para demonstração
   const notas = [
@@ -140,28 +147,40 @@ export function DetalhesOportunidade({ oportunidade, open, onOpenChange, onClien
   if (!oportunidade) return null
 
   return (
-    <Sheet
-      key={`opp-sheet-${oportunidade.id}`}
-      open={open}
-      onOpenChange={(newOpen) => {
-        // Only call onOpenChange if it's actually changing
-        if (open !== newOpen) {
-          onOpenChange(newOpen)
-        }
-      }}
-    >
-      <SheetContent className="w-full md:max-w-xl lg:max-w-2xl overflow-y-auto">
+    <Sheet open={open} onOpenChange={onOpenChange}>
+      <SheetContent 
+        className={`overflow-y-auto transition-all duration-300 ${
+          isExpanded ? "w-[95vw] max-w-[95vw]" : "w-full md:max-w-3xl lg:max-w-4xl"
+        }`}
+      >
         <SheetHeader className="mb-6">
-          <SheetTitle className="text-xl">{oportunidade.titulo}</SheetTitle>
+          <div className="flex justify-between items-center">
+            <SheetTitle className="text-xl">{oportunidade.titulo}</SheetTitle>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => setIsExpanded(!isExpanded)}
+              className="h-8 w-8 rounded-full"
+              title={isExpanded ? "Recolher painel" : "Expandir painel"}
+            >
+              {isExpanded ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
+            </Button>
+          </div>
           <div className="text-sm text-muted-foreground">
             <div className="flex items-center gap-2 mt-2">
               <Button 
                 variant="link" 
-                className="flex items-center gap-2 hover:underline p-0 h-auto" 
-                onClick={() => onClienteClick && onClienteClick(oportunidade.cliente)}
+                className="p-0 h-auto font-normal" 
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  if (onClienteClick) {
+                    onClienteClick(oportunidade.cliente);
+                  }
+                }}
               >
-                <Building className="w-4 h-4 text-gray-500" />
-                <span className="text-gray-700">{oportunidade.cliente}</span>
+                <Building className="w-4 h-4 mr-1" />
+                {oportunidade.cliente}
               </Button>
             </div>
           </div>
@@ -341,6 +360,73 @@ export function DetalhesOportunidade({ oportunidade, open, onOpenChange, onClien
                       <div className="flex items-center gap-2 mt-1">
                         <CalendarIcon className="w-4 h-4 text-gray-400" />
                         <span>{formData.dataAgenda || "15/06/2023"}</span>
+                      </div>
+                    )}
+                  </div>
+
+                  <div>
+                    <h3 className="text-sm font-medium text-gray-500">Tipo da Oportunidade</h3>
+                    {isEditing ? (
+                      <div className="mt-1">
+                        <Select
+                          value={formData.tipo || ""}
+                          onValueChange={(value) => {
+                            handleFieldChange("tipo", value);
+                            // Se mudar de produto para serviço, limpar tipoFaturamento
+                            if (value !== "produto") {
+                              handleFieldChange("tipoFaturamento", "");
+                            }
+                          }}
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="Selecione o tipo" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="produto">Produto</SelectItem>
+                            <SelectItem value="servico">Serviço</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        
+                        {formData.tipo === "produto" && (
+                          <div className="mt-3">
+                            <h3 className="text-sm font-medium text-gray-500">Tipo de Faturamento</h3>
+                            <div className="mt-1">
+                              <Select
+                                value={formData.tipoFaturamento || ""}
+                                onValueChange={(value) => handleFieldChange("tipoFaturamento", value)}
+                              >
+                                <SelectTrigger>
+                                  <SelectValue placeholder="Selecione o tipo de faturamento" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="direto">Direto</SelectItem>
+                                  <SelectItem value="distribuidor">Via Distribuidor</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    ) : (
+                      <div className="mt-1">
+                        <div className="flex flex-col space-y-2">
+                          <div className="flex items-center gap-2">
+                            <Badge variant="outline">
+                              {formData.tipo === "produto" ? "Produto" : formData.tipo === "servico" ? "Serviço" : "Não especificado"}
+                            </Badge>
+                          </div>
+                          
+                          {formData.tipo === "produto" && (
+                            <div className="flex items-center gap-2 mt-1">
+                              <span className="text-sm text-gray-500">Faturamento:</span>
+                              <Badge variant="outline">
+                                {formData.tipoFaturamento === "direto" ? "Direto" : 
+                                 formData.tipoFaturamento === "distribuidor" ? "Via Distribuidor" : 
+                                 "Não especificado"}
+                              </Badge>
+                            </div>
+                          )}
+                        </div>
                       </div>
                     )}
                   </div>
