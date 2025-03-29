@@ -2,10 +2,15 @@ import { NextRequest, NextResponse } from 'next/server';
 import { writeFile, mkdir } from 'fs/promises';
 import { existsSync } from 'fs';
 import * as path from 'path';
-import { v4 as uuidv4 } from 'uuid';
 
 // Diretório para armazenar arquivos
 const uploadDir = path.join(process.cwd(), 'public', 'uploads', 'documentos');
+
+// Função para gerar ID único sem dependência externa
+function generateUniqueId() {
+  // Combina timestamp com número aleatório para criar um ID único
+  return `${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
+}
 
 // POST - Upload de arquivo
 export async function POST(request: NextRequest) {
@@ -38,7 +43,7 @@ export async function POST(request: NextRequest) {
     // Gerar um nome de arquivo único para evitar colisões
     const fileName = file.name;
     const fileExt = path.extname(fileName);
-    const uniqueId = uuidv4();
+    const uniqueId = generateUniqueId();
     const uniqueFileName = `${uniqueId}${fileExt}`;
     const filePath = path.join(uploadDir, uniqueFileName);
 
