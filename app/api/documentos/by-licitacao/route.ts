@@ -7,7 +7,10 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const licitacaoId = searchParams.get('licitacaoId');
     
+    console.log(`[DEBUG] Buscando documentos para licitação: ${licitacaoId}`);
+    
     if (!licitacaoId) {
+      console.log('[DEBUG] ID da licitação não fornecido');
       return NextResponse.json(
         { error: 'ID da licitação é obrigatório' },
         { status: 400 }
@@ -15,18 +18,22 @@ export async function GET(request: NextRequest) {
     }
     
     // Buscar documentos da tabela documentos no schema crmonefactory
+    console.log('[DEBUG] Executando consulta no Supabase');
     const { data, error } = await crmonefactory
       .from('documentos')
       .select('*')
       .eq('licitacao_id', licitacaoId);
     
     if (error) {
-      console.error('Erro ao buscar documentos:', error);
+      console.error('[DEBUG] Erro ao buscar documentos:', error);
       return NextResponse.json(
         { error: 'Erro ao buscar documentos no banco de dados' },
         { status: 500 }
       );
     }
+    
+    console.log(`[DEBUG] Documentos encontrados: ${data?.length || 0}`);
+    console.log('[DEBUG] Dados brutos:', JSON.stringify(data || []));
     
     // Formatar os dados para o formato esperado pelo front-end
     const documentosFormatados = data.map((doc: any) => ({
@@ -41,9 +48,11 @@ export async function GET(request: NextRequest) {
       arquivo: doc.arquivo
     }));
     
+    console.log('[DEBUG] Documentos formatados:', JSON.stringify(documentosFormatados));
+    
     return NextResponse.json(documentosFormatados);
   } catch (error) {
-    console.error('Erro ao listar documentos:', error);
+    console.error('[DEBUG] Erro ao listar documentos:', error);
     return NextResponse.json(
       { error: 'Erro ao listar documentos' },
       { status: 500 }

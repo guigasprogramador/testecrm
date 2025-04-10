@@ -1,14 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { supabase } from '@/lib/supabase/client';
+import { supabase, crmonefactory } from '@/lib/supabase/client';
 
 // POST - Upload de arquivo para o Supabase Storage
 export async function POST(request: NextRequest) {
   try {
-    // Verificar autenticação
+    // Verificar autenticação (versão simplificada que aceita "anonymous")
     const authHeader = request.headers.get('authorization');
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
       return NextResponse.json({ error: 'Não autorizado' }, { status: 401 });
     }
+    // Não verificamos mais se o token é válido, apenas se o header existe
 
     // Verificar se a requisição é do tipo multipart/form-data
     const contentType = request.headers.get('content-type');
@@ -128,26 +129,116 @@ export async function POST(request: NextRequest) {
     console.log('URL pública:', publicUrl.publicUrl);
     console.log('licitacao_id:', licitacaoId);
     console.log('nome:', fileName);
-      
-    // Apenas retornar a URL do arquivo sem tentar registrar no banco
-    // Isto permite que o upload funcione mesmo sem a tabela 'documentos'
-    return NextResponse.json({
-      success: true,
-      note: "Arquivo enviado com sucesso para o storage. A tabela 'documentos' no schema 'crmonefactory' precisa ser criada para registrar os metadados.",
-      file: {
-        originalName: fileName,
-        name: uniqueFileName,
-        size: buffer.length,
-        url: publicUrl.publicUrl,
-        licitacaoId: licitacaoId
-      }
-    }, { status: 201 });
     
-  } catch (error) {
+    // NOVO: Registrar o documento na tabela 'documentos' do schema 'crmonefactory'
+    try {
+      // Determinar categoria ou tipo do documento
+      const categoria = tipo || determinarCategoriaPorExtensao(fileExt || '');
+      
+      // Data atual para os campos de auditoria
+      const dataAtual = new Date().toISOString();
+      
+      // Inserir registro na tabela documentos
+      const { data: documentoInserido, error: insertError } = await crmonefactory
+        .from('documentos')
+        .insert([
+          {
+            nome: fileName,
+            url: publicUrl.publicUrl,
+            arquivo: filePath,
+            tipo: categoria,
+            categoria: categoria,
+            formato: fileExt,
+            tamanho: buffer.length,
+            licitacao_id: licitacaoId,
+            status: 'ativo',
+            data_criacao: dataAtual,
+            data_atualizacao: dataAtual
+          }
+        ])
+        .select();
+      
+      if (insertError) {
+        console.error('Erro ao registrar documento no banco de dados:', insertError);
+        // Retornar sucesso parcial já que o arquivo foi enviado, mesmo que o registro falhe
+        return NextResponse.json({
+          success: true,
+          warning: 'Arquivo enviado com sucesso, mas houve um erro ao registrar no banco de dados',
+          error: insertError.message,
+          file: {
+            originalName: fileName,
+            name: uniqueFileName,
+            size: buffer.length,
+            url: publicUrl.publicUrl,
+            licitacaoId: licitacaoId
+          }
+        }, { status: 201 });
+      }
+      
+      console.log('Documento registrado com sucesso no banco de dados:', documentoInserido);
+      
+      // Retornar sucesso completo
+      return NextResponse.json({
+        success: true,
+        message: 'Arquivo enviado e registrado com sucesso',
+        documento: documentoInserido ? documentoInserido[0] : null,
+        file: {
+          originalName: fileName,
+          name: uniqueFileName,
+          size: buffer.length,
+          url: publicUrl.publicUrl,
+          licitacaoId: licitacaoId
+        }
+      }, { status: 201 });
+    }
+    catch (dbError: any) {
+      console.error('Erro inesperado ao registrar documento:', dbError);
+      
+      // Retornar sucesso parcial já que o arquivo foi enviado, mesmo que o registro falhe
+      return NextResponse.json({
+        success: true,
+        warning: 'Arquivo enviado com sucesso, mas houve um erro ao registrar no banco de dados',
+        error: dbError.message,
+        file: {
+          originalName: fileName,
+          name: uniqueFileName,
+          size: buffer.length,
+          url: publicUrl.publicUrl,
+          licitacaoId: licitacaoId
+        }
+      }, { status: 201 });
+    }
+    
+  } catch (error: any) {
     console.error('Erro ao fazer upload de arquivo:', error);
     return NextResponse.json(
-      { error: 'Erro ao processar upload de arquivo' },
+      { error: 'Erro ao processar upload de arquivo: ' + error.message },
       { status: 500 }
     );
   }
+}
+
+// Função para determinar categoria com base na extensão
+function determinarCategoriaPorExtensao(extensao: string): string {
+  const extensaoLower = extensao.toLowerCase();
+  
+  const categoriasExtensoes: Record<string, string[]> = {
+    'Documento': ['doc', 'docx', 'txt', 'rtf', 'odt'],
+    'Planilha': ['xls', 'xlsx', 'csv', 'ods'],
+    'Apresentação': ['ppt', 'pptx', 'odp'],
+    'PDF': ['pdf'],
+    'Imagem': ['jpg', 'jpeg', 'png', 'gif', 'bmp', 'tiff', 'webp'],
+    'Compactado': ['zip', 'rar', '7z', 'tar', 'gz'],
+    'Vídeo': ['mp4', 'avi', 'mov', 'wmv', 'mkv'],
+    'Áudio': ['mp3', 'wav', 'ogg', 'flac', 'm4a'],
+    'Código': ['html', 'css', 'js', 'ts', 'java', 'py', 'c', 'cpp', 'cs', 'php', 'sql']
+  };
+  
+  for (const [categoria, extensoes] of Object.entries(categoriasExtensoes)) {
+    if (extensoes.includes(extensaoLower)) {
+      return categoria;
+    }
+  }
+  
+  return 'Outro'; // Categoria padrão quando a extensão não é reconhecida
 }
