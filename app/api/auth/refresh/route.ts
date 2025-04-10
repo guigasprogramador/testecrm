@@ -89,7 +89,7 @@ export async function GET(request: NextRequest) {
       value: accessToken,
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
-      sameSite: "strict",
+      sameSite: "lax",
       maxAge: 15 * 60, // 15 minutos
       path: "/",
     });

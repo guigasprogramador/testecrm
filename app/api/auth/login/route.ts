@@ -143,7 +143,7 @@ function gerarResposta(user, accessToken, refreshToken) {
       value: accessToken,
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
-      sameSite: "strict",
+      sameSite: "lax",
       maxAge: 15 * 60, // 15 minutos
       path: "/",
     });
@@ -153,7 +153,7 @@ function gerarResposta(user, accessToken, refreshToken) {
       value: refreshToken,
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
-      sameSite: "strict",
+      sameSite: "lax",
       maxAge: 7 * 24 * 60 * 60, // 7 dias
       path: "/",
     });
