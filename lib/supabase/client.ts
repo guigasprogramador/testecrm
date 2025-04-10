@@ -32,3 +32,25 @@ export const getUserClient = async () => {
   // Caso contrário, retornamos o cliente normal
   return crmonefactory;
 };
+
+// Função para testar a conexão com o Supabase
+export const testSupabaseConnection = async () => {
+  try {
+    // Realizar uma consulta simples para testar a conexão
+    const { data, error } = await supabase.from('information_schema.tables').select('count(*)', { count: 'exact' }).limit(1);
+    
+    return {
+      success: !error,
+      message: error ? error.message : 'Conexão com o Supabase funcionando corretamente',
+      timestamp: new Date().toISOString(),
+      data
+    };
+  } catch (error: any) {
+    return {
+      success: false,
+      message: error?.message || 'Erro desconhecido ao conectar ao Supabase',
+      timestamp: new Date().toISOString(),
+      error
+    };
+  }
+};

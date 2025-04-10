@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabase } from "@/lib/supabase/client";
 import { verifyJwtToken } from "@/lib/auth/jwt";
-import bcrypt from "bcrypt";
+import bcrypt from "bcryptjs";
 
 // GET - Listar todos os usuários (apenas admin)
 export async function GET(request: NextRequest) {

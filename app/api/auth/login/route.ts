@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import bcrypt from "bcrypt";
+import bcrypt from "bcryptjs";
 import { supabase, crmonefactory } from "@/lib/supabase/client";
 import { generateTokens } from "@/lib/auth/jwt";
 
