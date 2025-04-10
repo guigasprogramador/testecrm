@@ -76,12 +76,8 @@ export function FiltroOportunidadesOtimizado({ onFilterChange, clientes, respons
   const handleFilterChange = (field: keyof OportunidadeFiltros, value: any) => {
     const novosFiltros = { ...filtros, [field]: value }
     setFiltros(novosFiltros)
-  }
-
-  // Aplica os filtros
-  const aplicarFiltros = () => {
-    onFilterChange(filtros)
-    setIsOpen(false)
+    // Aplicar o filtro automaticamente quando qualquer opção for selecionada
+    onFilterChange(novosFiltros)
   }
 
   // Limpa todos os filtros
@@ -98,6 +94,7 @@ export function FiltroOportunidadesOtimizado({ onFilterChange, clientes, respons
     }
     setFiltros(filtrosLimpos)
     onFilterChange(filtrosLimpos)
+    setIsOpen(false)
   }
 
   return (
@@ -308,7 +305,7 @@ export function FiltroOportunidadesOtimizado({ onFilterChange, clientes, respons
             Limpar filtros
           </Button>
           <SheetClose asChild>
-            <Button onClick={aplicarFiltros}>Aplicar filtros</Button>
+            <Button onClick={() => setIsOpen(false)}>Fechar</Button>
           </SheetClose>
         </SheetFooter>
       </SheetContent>

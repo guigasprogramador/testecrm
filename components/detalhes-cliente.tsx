@@ -4,7 +4,7 @@ import { useState, useEffect } from "react"
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Badge } from "@/components/ui/badge"
-import { Building, MapPin, Hash, Phone, Mail, User, Users, Pencil, Save, Trash2, Plus, X, Calendar, DollarSign, Maximize2, Minimize2 } from "lucide-react"
+import { Building, MapPin, Hash, Phone, Mail, User, Users, Pencil, Save, Trash2, Plus, X, Calendar, DollarSign, Maximize2, Minimize2, Eye } from "lucide-react"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -168,10 +168,7 @@ export function DetalhesCliente({ cliente, open, onOpenChange, onClienteUpdate, 
     setShowDeleteConfirm(false)
     onOpenChange(false)
     
-    toast({
-      title: "Cliente excluído",
-      description: "O cliente foi excluído com sucesso.",
-    })
+    // Toast é exibido pelo componente pai que implementa a exclusão
   }
 
   // Adicionar contato
@@ -518,7 +515,11 @@ export function DetalhesCliente({ cliente, open, onOpenChange, onClienteUpdate, 
                   {clienteDetalhes.oportunidades && clienteDetalhes.oportunidades.length > 0 ? (
                     <div className="space-y-3">
                       {clienteDetalhes.oportunidades.map((oportunidade) => (
-                        <Card key={oportunidade.id}>
+                        <Card 
+                          key={oportunidade.id} 
+                          className="hover:border-primary cursor-pointer transition-colors"
+                          onClick={() => onOportunidadeClick && onOportunidadeClick(oportunidade)}
+                        >
                           <CardContent className="p-4">
                             <div className="flex justify-between items-start">
                               <div>
@@ -534,8 +535,20 @@ export function DetalhesCliente({ cliente, open, onOpenChange, onClienteUpdate, 
                                   <span className="text-xs ml-2">{oportunidade.valor}</span>
                                 </div>
                               </div>
-                              <div className="text-xs text-right">
-                                <div>Prazo: {oportunidade.prazo}</div>
+                              <div className="flex flex-col items-end">
+                                <div className="text-xs text-right">Prazo: {oportunidade.prazo}</div>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="mt-2 text-blue-600 p-0 h-auto flex items-center hover:text-blue-800 hover:bg-transparent"
+                                  onClick={(e) => {
+                                    e.stopPropagation(); // Evitar que o clique propague para o Card
+                                    onOportunidadeClick && onOportunidadeClick(oportunidade);
+                                  }}
+                                >
+                                  <Eye className="h-3.5 w-3.5 mr-1" />
+                                  Visualizar
+                                </Button>
                               </div>
                             </div>
                           </CardContent>

@@ -3,6 +3,7 @@ import { useState, useEffect, useCallback } from 'react';
 interface EstatisticasComercial {
   periodo: string;
   totalOportunidades: number;
+  leadsEmAberto: number;
   estatisticasPorStatus: {
     novo_lead: number;
     agendamento_reuniao: number;
@@ -29,30 +30,45 @@ export function useEstatisticas() {
     setError(null);
     
     try {
-      // Construir URL com parâmetros de filtro
       let url = '/api/comercial/estatisticas';
       
       if (periodo) {
         url += `?periodo=${periodo}`;
       }
       
-      const response = await fetch(url);
+      console.log('Buscando estatísticas de:', url);
+      const response = await fetch(url, {
+        cache: 'no-store',
+        headers: {
+          'Pragma': 'no-cache',
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+          'Expires': '0',
+          'X-Timestamp': new Date().getTime().toString()
+        }
+      });
       
       if (!response.ok) {
         throw new Error('Erro ao buscar estatísticas');
       }
       
       const data = await response.json();
+      console.log('Dados de estatísticas recebidos:', data);
       setEstatisticas(data);
+      return data;
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Erro desconhecido');
       console.error('Erro ao buscar estatísticas:', err);
+      return null;
     } finally {
       setIsLoading(false);
     }
   }, []);
 
-  // Carregar estatísticas ao montar o componente
+  const forceUpdateEstatisticas = useCallback((novasEstatisticas: EstatisticasComercial) => {
+    console.log('Forçando atualização de estatísticas com:', novasEstatisticas);
+    setEstatisticas(novasEstatisticas);
+  }, []);
+
   useEffect(() => {
     fetchEstatisticas();
   }, [fetchEstatisticas]);
@@ -62,5 +78,6 @@ export function useEstatisticas() {
     isLoading,
     error,
     fetchEstatisticas,
+    setEstatisticas: forceUpdateEstatisticas,
   };
 }

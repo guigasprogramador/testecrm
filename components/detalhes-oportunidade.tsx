@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Separator } from "@/components/ui/separator"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import {
   Mail,
   Phone,
@@ -25,14 +26,28 @@ import {
   ChevronLeft,
   ChevronRight,
   Maximize2,
-  Minimize2
+  Minimize2,
+  MapPin,
+  Users
 } from "lucide-react"
 import Link from "next/link"
+
+interface Reuniao {
+  id: string;
+  titulo: string;
+  data: string;
+  hora: string;
+  local: string;
+  participantes: string[];
+  concluida: boolean;
+  notas?: string;
+}
 
 interface Oportunidade {
   id: string
   titulo: string
   cliente: string
+  clienteId?: string
   valor: string
   responsavel: string
   prazo: string
@@ -41,6 +56,8 @@ interface Oportunidade {
   dataAgenda?: string
   tipo?: "produto" | "servico"
   tipoFaturamento?: "direto" | "distribuidor"
+  dataReuniao?: string
+  horaReuniao?: string
 }
 
 interface DetalhesOportunidadeProps {
@@ -87,7 +104,7 @@ export function DetalhesOportunidade({ oportunidade, open, onOpenChange, onClien
   const [formData, setFormData] = useState<Partial<Oportunidade>>({})
   const [isExpanded, setIsExpanded] = useState(false)
 
-  // Dados fictícios para demonstração
+  // Dados fictícios para demonstração - Notas
   const notas = [
     {
       id: 1,
@@ -102,6 +119,39 @@ export function DetalhesOportunidade({ oportunidade, open, onOpenChange, onClien
       texto: "Cliente solicitou detalhamento do módulo de relatórios e exportação de dados.",
     },
   ]
+  
+  // Dados fictícios para demonstração - Reuniões
+  const reunioes: Reuniao[] = [
+    {
+      id: "reuniao-1",
+      titulo: "Apresentação inicial da solução",
+      data: "15/05/2023",
+      hora: "14:30",
+      local: "Escritório do cliente",
+      participantes: ["Ana Silva", "Carlos Pereira", "Roberto (Cliente)"],
+      concluida: true,
+      notas: "Cliente demonstrou interesse na solução, solicitou detalhamento técnico adicional."
+    },
+    {
+      id: "reuniao-2",
+      titulo: "Demonstração técnica",
+      data: "28/05/2023",
+      hora: "10:00",
+      local: "Videoconferência",
+      participantes: ["Ana Silva", "Equipe técnica", "Departamento de TI (Cliente)"],
+      concluida: true,
+      notas: "Detalhamento da arquitetura e integrações. Cliente solicitou orçamento detalhado."
+    },
+    {
+      id: "reuniao-3",
+      titulo: "Apresentação da proposta comercial",
+      data: "15/06/2023",
+      hora: "15:00",
+      local: "Sede da empresa",
+      participantes: ["Ana Silva", "Diretor Comercial", "Diretoria (Cliente)"],
+      concluida: false
+    }
+  ];
 
   useEffect(() => {
     if (oportunidade) {
@@ -215,8 +265,9 @@ export function DetalhesOportunidade({ oportunidade, open, onOpenChange, onClien
         </SheetHeader>
 
         <Tabs defaultValue="resumo" value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="grid grid-cols-3 mb-4">
+          <TabsList className="grid grid-cols-4 mb-4">
             <TabsTrigger value="resumo">Resumo</TabsTrigger>
+            <TabsTrigger value="agendamentos">Agendamentos</TabsTrigger>
             <TabsTrigger value="notas">Notas</TabsTrigger>
             <TabsTrigger value="servicos">Serviços</TabsTrigger>
           </TabsList>
@@ -431,6 +482,44 @@ export function DetalhesOportunidade({ oportunidade, open, onOpenChange, onClien
                     )}
                   </div>
                 </div>
+              </div>
+            </div>
+          )}
+
+          {activeTab === "agendamentos" && (
+            <div className="space-y-4">
+              <div className="flex justify-between items-center">
+                <h3 className="text-lg font-medium">Agendamentos</h3>
+              </div>
+
+              <div className="space-y-3">
+                {reunioes.map((reuniao) => (
+                  <div key={reuniao.id} className="border rounded-lg p-4 hover:border-gray-400 transition-colors">
+                    <div className="flex justify-between">
+                      <div>
+                        <h4 className="font-medium">{reuniao.titulo}</h4>
+                        <p className="text-sm text-gray-500 mt-1">
+                          {reuniao.data} - {reuniao.hora} - {reuniao.local}
+                        </p>
+                      </div>
+                      <div className="font-semibold">{reuniao.concluida ? "Concluída" : "Pendente"}</div>
+                    </div>
+                    <div className="flex flex-wrap gap-2 mt-2">
+                      {reuniao.participantes.map((participante) => (
+                        <Badge key={participante} variant="outline" className="flex items-center gap-1">
+                          <Users className="w-3 h-3" />
+                          {participante}
+                        </Badge>
+                      ))}
+                    </div>
+                    {reuniao.notas && (
+                      <div className="mt-2">
+                        <h4 className="text-sm font-medium">Notas:</h4>
+                        <p className="text-sm text-gray-500">{reuniao.notas}</p>
+                      </div>
+                    )}
+                  </div>
+                ))}
               </div>
             </div>
           )}

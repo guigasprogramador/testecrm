@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { Oportunidade } from '@/types/comercial';
 import * as fs from 'fs';
 import * as path from 'path';
+import { supabase, crmonefactory } from "@/lib/supabase/client";
 
 // Path para o arquivo de "banco de dados"
 const dbPath = path.join(process.cwd(), 'data', 'oportunidades.json');
@@ -145,7 +146,7 @@ export async function GET(
 ) {
   try {
     const oportunidades = await carregarOportunidades();
-    const id = params.id;
+    const id = await params.id;
     console.log(`Buscando oportunidade com ID: ${id}`);
     
     const oportunidade = oportunidades.find((o) => o.id === id);
@@ -176,7 +177,7 @@ export async function PUT(
 ) {
   try {
     const oportunidades = await carregarOportunidades();
-    const id = params.id;
+    const id = await params.id;
     const dadosAtualizados = await request.json();
     
     const index = oportunidades.findIndex(o => o.id === id);
@@ -224,34 +225,88 @@ export async function PATCH(
   { params }: { params: { id: string } }
 ) {
   try {
-    const oportunidades = await carregarOportunidades();
-    const id = params.id;
+    // Obter o ID dos parâmetros da rota de forma correta
+    const id = await params.id;
     const { status } = await request.json();
     
-    const index = oportunidades.findIndex(o => o.id === id);
+    console.log(`Atualizando status da oportunidade ${id} para ${status}`);
     
-    if (index === -1) {
-      return NextResponse.json(
-        { error: 'Oportunidade não encontrada' },
-        { status: 404 }
-      );
+    // Primeiro tentar atualizar no Supabase
+    try {
+      console.log(`Tentando atualizar no Supabase com ID: ${id}`);
+      
+      // Verificar se o ID é válido antes de tentar a atualização
+      if (!id) {
+        throw new Error('ID da oportunidade inválido');
+      }
+      
+      // Criar um timestamp atual para usar em ambos os campos de data
+      const currentTimestamp = new Date().toISOString();
+      
+      const { data, error } = await crmonefactory
+        .from('oportunidades')
+        .update({ 
+          status: status,
+          data_atualizacao: currentTimestamp
+          // Removido o campo updated_at que não existe na tabela
+        })
+        .eq('id', id)
+        .select()
+        .single();
+      
+      if (error) {
+        console.error("Erro detalhado na atualização Supabase:", JSON.stringify(error));
+        throw error; // Lançar o erro para cair no fallback
+      }
+      
+      // Se chegou aqui, a atualização no Supabase foi bem-sucedida
+      console.log("Atualização no Supabase bem-sucedida:", data);
+      return NextResponse.json({
+        id: id,
+        status,
+        success: true,
+        data: data || null
+      });
+      
+    } catch (supabaseError) {
+      console.error("Erro na atualização Supabase:", supabaseError);
+      console.log("Tentando fallback para arquivo local...");
+      
+      // Fallback: atualizar no arquivo local
+      const oportunidades = await carregarOportunidades();
+      const index = oportunidades.findIndex(o => o.id === id);
+      
+      if (index === -1) {
+        return NextResponse.json(
+          { error: 'Oportunidade não encontrada' },
+          { status: 404 }
+        );
+      }
+      
+      // Atualizar no arquivo local
+      const currentTimestamp = new Date().toISOString();
+      oportunidades[index] = {
+        ...oportunidades[index],
+        status,
+        dataAtualizacao: currentTimestamp
+        // Removido o campo updated_at que não é necessário
+      };
+      
+      await salvarOportunidades(oportunidades);
+      console.log("Atualização no arquivo local bem-sucedida");
+      
+      // Retornar a oportunidade atualizada do arquivo local
+      return NextResponse.json({
+        ...oportunidades[index],
+        success: true,
+        source: 'local_file'
+      });
     }
     
-    // Atualizar apenas o status
-    const agora = new Date().toISOString();
-    oportunidades[index] = {
-      ...oportunidades[index],
-      status,
-      dataAtualizacao: agora
-    };
-    
-    await salvarOportunidades(oportunidades);
-    
-    return NextResponse.json(oportunidades[index]);
   } catch (error) {
-    console.error('Erro ao atualizar status da oportunidade:', error);
+    console.error('Erro ao atualizar status:', error);
     return NextResponse.json(
-      { error: 'Erro ao atualizar status da oportunidade' },
+      { error: `Erro na atualização: ${error instanceof Error ? error.message : 'Erro desconhecido'}` },
       { status: 500 }
     );
   }
@@ -264,7 +319,7 @@ export async function DELETE(
 ) {
   try {
     const oportunidades = await carregarOportunidades();
-    const id = params.id;
+    const id = await params.id;
     
     const index = oportunidades.findIndex(o => o.id === id);
     

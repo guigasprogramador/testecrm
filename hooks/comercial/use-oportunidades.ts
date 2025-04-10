@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Oportunidade, OportunidadeFiltros, OportunidadeStatus } from '@/types/comercial';
+import { supabase, crmonefactory } from '@/lib/supabase/client';
 
 export function useOportunidades() {
   const [oportunidades, setOportunidades] = useState<Oportunidade[]>([]);
@@ -74,14 +75,28 @@ export function useOportunidades() {
         body: JSON.stringify(oportunidade),
       });
       
+      // Verificar primeiro se a resposta está ok antes de tentar parsear o JSON
       if (!response.ok) {
-        throw new Error('Erro ao criar oportunidade');
+        let errorMessage = `Erro ao criar oportunidade: ${response.status} ${response.statusText}`;
+        
+        try {
+          // Tentar obter a mensagem de erro como JSON, se possível
+          const errorData = await response.json();
+          if (errorData && errorData.error) {
+            errorMessage = errorData.error;
+          }
+        } catch (parseError) {
+          // Se não conseguir parsear como JSON, usar a mensagem de erro genérica
+          console.error('Erro ao parsear resposta de erro:', parseError);
+        }
+        
+        throw new Error(errorMessage);
       }
       
-      const novaOportunidade = await response.json();
-      setOportunidades((prev) => [...prev, novaOportunidade]);
-      
-      return novaOportunidade;
+      // Se chegou aqui, a resposta está ok, agora podemos parsear com segurança
+      const data = await response.json();
+      setOportunidades((prev) => [...prev, data]);
+      return data;
     } catch (err) {
       console.error('Erro ao criar oportunidade:', err);
       throw err;
@@ -98,17 +113,19 @@ export function useOportunidades() {
         body: JSON.stringify(data),
       });
       
+      // Obter a resposta JSON para acessar mensagens de erro específicas
+      const respData = await response.json();
+      
       if (!response.ok) {
-        throw new Error('Erro ao atualizar oportunidade');
+        // Capturar a mensagem de erro específica da API
+        throw new Error(respData.error || 'Erro ao atualizar oportunidade');
       }
       
-      const oportunidadeAtualizada = await response.json();
-      
       setOportunidades((prev) =>
-        prev.map((opp) => (opp.id === id ? oportunidadeAtualizada : opp))
+        prev.map((opp) => (opp.id === id ? respData : opp))
       );
       
-      return oportunidadeAtualizada;
+      return respData;
     } catch (err) {
       console.error('Erro ao atualizar oportunidade:', err);
       throw err;
@@ -117,25 +134,54 @@ export function useOportunidades() {
 
   const updateOportunidadeStatus = useCallback(async (id: string, status: OportunidadeStatus) => {
     try {
-      const response = await fetch(`/api/comercial/oportunidades/${id}`, {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ status }),
-      });
+      console.log(`Tentando atualizar oportunidade ${id} para status ${status}`);
       
-      if (!response.ok) {
-        throw new Error('Erro ao atualizar status da oportunidade');
-      }
-      
-      const oportunidadeAtualizada = await response.json();
-      
+      // Primeiro atualizar o estado local para feedback imediato
       setOportunidades((prev) =>
-        prev.map((opp) => (opp.id === id ? oportunidadeAtualizada : opp))
+        prev.map((opp) => (opp.id === id ? { ...opp, status } : opp))
       );
       
-      return oportunidadeAtualizada;
+      // Usar o cliente Supabase centralizado com o schema correto
+      try {
+        console.log('Atualizando status via cliente Supabase...');
+        const { data, error } = await crmonefactory
+          .from('oportunidades')
+          .update({
+            status: status,
+            data_atualizacao: new Date().toISOString()
+          })
+          .eq('id', id)
+          .select()
+          .single();
+          
+        if (error) {
+          console.error('Erro ao atualizar no Supabase:', error);
+          throw error;
+        }
+        
+        console.log('Atualização via cliente Supabase bem-sucedida:', data);
+        return data;
+      } catch (supabaseError) {
+        console.error('Falha no Supabase, tentando via API:', supabaseError);
+        
+        // Tentar pela API normal como fallback
+        const response = await fetch(`/api/comercial/oportunidades/${id}`, {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ status }),
+        });
+        
+        const data = await response.json();
+        
+        if (!response.ok) {
+          throw new Error(data.error || 'Erro ao atualizar status da oportunidade');
+        }
+        
+        console.log('Atualização via API bem-sucedida:', data);
+        return data;
+      }
     } catch (err) {
       console.error('Erro ao atualizar status da oportunidade:', err);
       throw err;
@@ -149,11 +195,17 @@ export function useOportunidades() {
       });
       
       if (!response.ok) {
-        throw new Error('Erro ao excluir oportunidade');
+        // Tentar obter uma mensagem de erro detalhada se disponível
+        try {
+          const errorData = await response.json();
+          throw new Error(errorData.error || 'Erro ao excluir oportunidade');
+        } catch (jsonError) {
+          // Se não conseguir obter o JSON, usar o status HTTP
+          throw new Error(`Erro ao excluir oportunidade: ${response.status} ${response.statusText}`);
+        }
       }
       
       setOportunidades((prev) => prev.filter((opp) => opp.id !== id));
-      
       return true;
     } catch (err) {
       console.error('Erro ao excluir oportunidade:', err);

@@ -41,6 +41,8 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
+import { ResumoLicitacao } from "./resumo-licitacao"
+import { ServicosLicitacao } from "./servicos-licitacao"
 
 interface Licitacao {
   id: string
@@ -122,6 +124,8 @@ export function DetalhesLicitacao({
   const [formData, setFormData] = useState<Partial<Licitacao>>({})
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const [isExpanded, setIsExpanded] = useState(false)
+  const [documentosLicitacao, setDocumentosLicitacao] = useState<any[]>([])
+  const [carregandoDocumentos, setCarregandoDocumentos] = useState(false)
 
   const servicosOferecidos = [
     {
@@ -144,30 +148,6 @@ export function DetalhesLicitacao({
     },
   ]
 
-  const documentos = [
-    {
-      id: 1,
-      nome: "Edital_Pregao_123.pdf",
-      tipo: "Edital",
-      data: "10/05/2023",
-      tamanho: "2.5 MB",
-    },
-    {
-      id: 2,
-      nome: "Proposta_Comercial.pdf",
-      tipo: "Proposta",
-      data: "15/05/2023",
-      tamanho: "1.8 MB",
-    },
-    {
-      id: 3,
-      nome: "Documentacao_Tecnica.pdf",
-      tipo: "Documentação",
-      data: "18/05/2023",
-      tamanho: "3.2 MB",
-    },
-  ]
-
   // Reset active tab when opening the sheet
   useEffect(() => {
     if (open) {
@@ -181,6 +161,38 @@ export function DetalhesLicitacao({
       setFormData({ ...licitacao })
     }
   }, [licitacao])
+
+  useEffect(() => {
+    // Carregar documentos quando a aba documentos for selecionada
+    if (activeTab === "documentos" && licitacao?.id) {
+      buscarDocumentos(licitacao.id);
+    }
+  }, [activeTab, licitacao?.id]);
+
+  // Função para buscar documentos da licitação
+  const buscarDocumentos = async (licitacaoId: string) => {
+    try {
+      setCarregandoDocumentos(true);
+      const response = await fetch(`/api/documentos/by-licitacao?licitacaoId=${licitacaoId}`);
+      
+      if (!response.ok) {
+        throw new Error('Erro ao buscar documentos');
+      }
+      
+      const data = await response.json();
+      setDocumentosLicitacao(data || []);
+    } catch (error) {
+      console.error('Erro ao buscar documentos:', error);
+      toast.error('Não foi possível carregar os documentos');
+    } finally {
+      setCarregandoDocumentos(false);
+    }
+  };
+
+  // Função para baixar um documento
+  const baixarDocumento = (url: string, nome: string) => {
+    window.open(url, '_blank');
+  };
 
   const handleFieldChange = (field: string, value: string) => {
     setFormData((prev) => ({
@@ -312,7 +324,10 @@ export function DetalhesLicitacao({
           </TabsList>
 
           <TabsContent value="resumo">
-            <div className="space-y-6">
+            {/* Importar o componente de resumo */}
+            <ResumoLicitacao licitacaoId={licitacao.id} isEditing={isEditing} />
+            
+            <div className="space-y-6 mt-6">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
                   <h3 className="text-sm font-medium text-gray-500 mb-4">Informações Básicas</h3>
@@ -535,43 +550,8 @@ export function DetalhesLicitacao({
           </TabsContent>
 
           <TabsContent value="servicos">
-            <div className="space-y-4">
-              <div className="flex justify-between items-center">
-                <h3 className="text-lg font-medium">Serviços</h3>
-                {isEditing && (
-                  <Button size="sm" className="gap-2">
-                    <Plus className="w-4 h-4" />
-                    Adicionar Serviço
-                  </Button>
-                )}
-              </div>
-
-              <div className="space-y-3">
-                {servicosOferecidos.map((servico) => (
-                  <div key={servico.id} className="border rounded-lg p-4 hover:border-gray-400 transition-colors">
-                    <div className="flex justify-between">
-                      <div>
-                        <h4 className="font-medium">{servico.nome}</h4>
-                        <p className="text-sm text-gray-500 mt-1">{servico.descricao}</p>
-                      </div>
-                      <div className="font-semibold">{servico.valor}</div>
-                    </div>
-                    {isEditing && (
-                      <div className="flex justify-end mt-3 gap-2">
-                        <Button size="sm" variant="outline">
-                          <Edit className="w-3 h-3 mr-1" />
-                          Editar
-                        </Button>
-                        <Button size="sm" variant="destructive">
-                          <Trash2 className="w-3 h-3 mr-1" />
-                          Remover
-                        </Button>
-                      </div>
-                    )}
-                  </div>
-                ))}
-              </div>
-            </div>
+            {/* Componente de serviços da licitação */}
+            <ServicosLicitacao licitacaoId={licitacao.id} isEditing={isEditing} />
           </TabsContent>
 
           <TabsContent value="documentos">
@@ -585,34 +565,46 @@ export function DetalhesLicitacao({
               </div>
 
               <div className="space-y-3">
-                {documentos.map((doc) => (
-                  <div key={doc.id} className="flex items-center justify-between p-3 border rounded-lg">
-                    <div className="flex items-center gap-3">
-                      <FileText className="w-5 h-5 text-blue-500" />
-                      <div>
-                        <p className="font-medium">{doc.nome}</p>
-                        <div className="flex gap-4 text-sm text-gray-500">
-                          <span>{doc.tipo}</span>
-                          <span>{doc.data}</span>
-                          <span>{doc.tamanho}</span>
+                {carregandoDocumentos ? (
+                  <div className="flex justify-center py-8">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-700"></div>
+                  </div>
+                ) : documentosLicitacao.length > 0 ? (
+                  documentosLicitacao.map((doc) => (
+                    <div key={doc.id} className="flex items-center justify-between p-3 border rounded-lg">
+                      <div className="flex items-center gap-3">
+                        <FileText className="w-5 h-5 text-blue-500" />
+                        <div>
+                          <p className="font-medium">{doc.nome}</p>
+                          <div className="flex gap-4 text-sm text-gray-500">
+                            <span>{doc.tipo}</span>
+                            <span>{doc.data}</span>
+                            <span>{doc.tamanho}</span>
+                          </div>
                         </div>
                       </div>
-                    </div>
-                    <div className="flex gap-2">
-                      <Button variant="ghost" size="icon">
-                        <Eye className="w-4 h-4" />
-                      </Button>
-                      <Button variant="ghost" size="icon">
-                        <Download className="w-4 h-4" />
-                      </Button>
-                      {isEditing && (
-                        <Button variant="ghost" size="icon" className="text-red-500">
-                          <Trash2 className="w-4 h-4" />
+                      <div className="flex gap-2">
+                        <Button variant="ghost" size="icon" onClick={() => window.open(doc.url, '_blank')}>
+                          <Eye className="w-4 h-4" />
                         </Button>
-                      )}
+                        <Button variant="ghost" size="icon" onClick={() => baixarDocumento(doc.url, doc.nome)}>
+                          <Download className="w-4 h-4" />
+                        </Button>
+                        {isEditing && (
+                          <Button variant="ghost" size="icon" className="text-red-500">
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
+                        )}
+                      </div>
                     </div>
+                  ))
+                ) : (
+                  <div className="text-center py-8 text-gray-500">
+                    <FileText className="w-12 h-12 mx-auto mb-3 text-gray-300" />
+                    <p>Nenhum documento encontrado para esta licitação</p>
+                    <p className="text-sm mt-1">Faça upload de documentos usando o botão acima</p>
                   </div>
-                ))}
+                )}
               </div>
             </div>
           </TabsContent>

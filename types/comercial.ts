@@ -38,6 +38,9 @@ export interface Oportunidade {
   responsaveisIds?: string[];
   tipo?: OportunidadeTipo;
   tipoFaturamento?: OportunidadeTipoFaturamento;
+  probabilidade?: number; // Probabilidade de fechamento (%)
+  motivoPerda?: string; // Motivo da perda da oportunidade
+  posicaoKanban?: number; // Posição no quadro Kanban
 }
 
 export type OportunidadeStatus = 

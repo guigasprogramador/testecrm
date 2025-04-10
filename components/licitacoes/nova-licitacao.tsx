@@ -2,7 +2,7 @@
 
 import type React from "react"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import {
   Dialog,
@@ -79,7 +79,9 @@ export function NovaLicitacao({ onLicitacaoAdded }: NovaLicitacaoProps) {
   ])
 
   // Estado para arquivos anexados
-  const [arquivosAnexados, setArquivosAnexados] = useState<File[]>([])
+  const [arquivosAnexados, setArquivosAnexados] = useState<File[]>([]);
+  const [isUploading, setIsUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
 
   // Estado para simulação de impostos
   const [impostos, setImpostos] = useState({
@@ -93,6 +95,8 @@ export function NovaLicitacao({ onLicitacaoAdded }: NovaLicitacaoProps) {
   // Estado para criar evento no calendário
   const [criarEvento, setCriarEvento] = useState(true)
   const [enviarNotificacoes, setEnviarNotificacoes] = useState(true)
+
+
 
   // Funções de manipulação de formulário
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
@@ -138,101 +142,178 @@ export function NovaLicitacao({ onLicitacaoAdded }: NovaLicitacaoProps) {
     return valorProposta * (1 + totalImpostos)
   }
 
+  // Função para fazer upload de documentos para o Supabase Storage
+  const uploadDocumentos = async (licitacaoId: string): Promise<boolean> => {
+    try {
+      if (arquivosAnexados.length === 0) {
+        return true; // Não há documentos para enviar
+      }
+
+      setIsUploading(true);
+      setUploadProgress(0);
+
+      // Obter token de autenticação
+      const accessToken = localStorage.getItem('accessToken');
+      if (!accessToken) {
+        throw new Error("Usuário não autenticado");
+      }
+
+      // Contador para calcular progresso
+      let documentosProcessados = 0;
+
+      // Upload de cada arquivo
+      for (const arquivo of arquivosAnexados) {
+        const formData = new FormData();
+        formData.append('file', arquivo);
+        formData.append('licitacaoId', licitacaoId);
+        formData.append('tipo', 'documento');
+
+        const response = await fetch('/api/documentos/upload', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${accessToken}`
+          },
+          body: formData
+        });
+
+        if (!response.ok) {
+          const errorData = await response.text();
+          console.error(`Erro ao fazer upload de ${arquivo.name}:`, errorData);
+          // Continue enviando os outros documentos mesmo se um falhar
+        }
+
+        // Atualizar progresso
+        documentosProcessados++;
+        setUploadProgress(Math.round((documentosProcessados / arquivosAnexados.length) * 100));
+      }
+
+      setIsUploading(false);
+      return true;
+    } catch (error) {
+      console.error('Erro ao fazer upload de documentos:', error);
+      setIsUploading(false);
+      return false;
+    }
+  };
+
   const handleSubmit = async () => {
     // Validar campos obrigatórios
     if (!formData.nome || !formData.orgao || !prazoEnvio || !dataJulgamento || !formData.tipo) {
-      alert("Por favor, preencha todos os campos obrigatórios.")
-      return
+      alert("Por favor, preencha todos os campos obrigatórios.");
+      return;
     }
 
     if(formData.tipo === "produto" && !formData.tipoFaturamento) {
-      alert("Por favor, selecione o tipo de faturamento.")
-      return
+      alert("Por favor, selecione o tipo de faturamento.");
+      return;
     }
 
-    setIsSubmitting(true)
+    setIsSubmitting(true);
 
     try {
+      // Obter token de autenticação
+      const accessToken = localStorage.getItem('accessToken');
+      
+      // Primeiro, criar ou buscar o órgão
+      const orgaoData = {
+        nome: formData.orgao,
+        tipo: "publico", // Valor padrão para órgãos de licitação
+      }
+      
+      console.log("Criando/buscando órgão:", orgaoData)
+      const orgaoResponse = await fetch("/api/licitacoes/orgaos", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${accessToken}`
+        },
+        body: JSON.stringify(orgaoData),
+      })
+      
+      if (!orgaoResponse.ok) {
+        const errorData = await orgaoResponse.text()
+        throw new Error(`Erro ao criar/buscar órgão: ${orgaoResponse.status} ${errorData}`)
+      }
+      
+      const orgaoResult = await orgaoResponse.json()
+      const orgaoId = orgaoResult.id
+      
+      console.log("Órgão criado/encontrado com ID:", orgaoId)
+      
       // Preparar os dados conforme o tipo Licitacao da nossa API
       const licitacaoData = {
         titulo: formData.nome,
         orgao: formData.orgao,
-        orgaoId: formData.orgao.toLowerCase().replace(/\s/g, "_"),
+        orgaoId: orgaoId, // Adicionado o ID do órgão
         status: formData.status,
         dataAbertura: prazoEnvio ? format(prazoEnvio, "yyyy-MM-dd") : undefined,
         dataPublicacao: dataPublicacao ? format(dataPublicacao, "yyyy-MM-dd") : undefined,
         valorEstimado: formData.valorEstimado ? Number(formData.valorEstimado.replace(/[^\d,]/g, "").replace(",", ".")) : 0,
-        valorProposta: formData.valorProposta ? Number(formData.valorProposta.replace(/[^\d,]/g, "").replace(",", ".")) : undefined,
+        valorProposta: formData.valorProposta ? Number(formData.valorProposta.replace(/[^\d,]/g, "").replace(",", ".")) : 0,
         modalidade: formData.modalidade,
         objeto: formData.descricao,
-        edital: formData.numeroEdital,
         numeroEdital: formData.numeroEdital,
-        responsavel: responsaveis.find(r => r.selecionado)?.nome || "Não atribuído",
-        responsavelId: responsaveis.find(r => r.selecionado)?.id,
-        responsaveisIds: responsaveis.filter(r => r.selecionado).map(r => r.id),
-        prazo: prazoEnvio ? format(prazoEnvio, "dd/MM/yyyy") : "",
+        dataJulgamento: dataJulgamento ? format(dataJulgamento, "yyyy-MM-dd") : undefined,
         urlLicitacao: formData.urlLicitacao,
-        descricao: formData.descricao,
-        formaPagamento: "",
-        obsFinanceiras: "",
         tipo: formData.tipo,
         tipoFaturamento: formData.tipoFaturamento,
-        margemLucro: formData.margemLucro ? Number(formData.margemLucro) : undefined,
+        margemLucro: formData.margemLucro ? Number(formData.margemLucro) : 0,
         contatoNome: formData.contatoNome,
         contatoEmail: formData.contatoEmail,
         contatoTelefone: formData.contatoTelefone,
-        dataJulgamento: dataJulgamento ? format(dataJulgamento, "yyyy-MM-dd") : undefined,
-        // Informações adicionais que podem ser úteis para o front-end mas não são necessariamente parte da API
-        documentosNecessarios: documentosNecessarios.filter(d => d.selecionado).map(doc => ({
-          id: doc.id,
-          nome: doc.nome,
-          tipo: "documento",
-          url: "",
-          licitacaoId: "",
-          dataCriacao: new Date().toISOString(),
-          dataAtualizacao: new Date().toISOString(),
-        }))
+        // Processar documentos selecionados
+        documentos: documentosNecessarios
+          .filter((doc) => doc.selecionado)
+          .map((doc) => ({
+            nome: doc.nome,
+            tipo: "documento",
+            categoria: "edital",
+          })),
+        // Processar responsáveis selecionados
+        responsaveis: responsaveis
+          .filter((resp) => resp.selecionado)
+          .map((resp) => ({
+            usuarioId: resp.id,
+            papel: "colaborador",
+          })),
       }
 
-      // Chamada à API
-      const response = await fetch('/api/licitacoes', {
-        method: 'POST',
+      // Enviar para a API
+      console.log("Enviando dados para API:", licitacaoData)
+      const response = await fetch("/api/licitacoes", {
+        method: "POST",
         headers: {
-          'Content-Type': 'application/json',
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${accessToken}`
         },
         body: JSON.stringify(licitacaoData),
       })
 
       if (!response.ok) {
-        const errorData = await response.json()
-        throw new Error(errorData.error || 'Erro ao criar licitação')
+        const errorData = await response.text()
+        throw new Error(`Erro ao criar licitação: ${response.status} ${errorData}`)
       }
 
-      const novaLicitacao = await response.json()
+      const data = await response.json()
+      console.log("Licitação criada com sucesso:", data)
 
-      // Se tiver arquivos anexados, poderia enviar em outro endpoint
+      // Upload dos documentos anexados
       if (arquivosAnexados.length > 0) {
-        console.log(`${arquivosAnexados.length} arquivos seriam enviados para a API de upload`)
-        // Aqui implementaríamos o upload de arquivos em uma situação real
+        console.log(`Enviando ${arquivosAnexados.length} documentos para a licitação ${data.id}...`);
+        const uploadSuccess = await uploadDocumentos(data.id);
+        
+        if (!uploadSuccess) {
+          console.warn("Alguns documentos podem não ter sido enviados corretamente.");
+          alert("A licitação foi criada, mas alguns documentos podem não ter sido enviados corretamente. Verifique a aba Documentos.");
+        }
       }
 
-      // Criar evento no calendário (simulação ou integração real)
-      if (criarEvento && prazoEnvio) {
-        console.log(`Evento criado no calendário para ${format(prazoEnvio, "dd/MM/yyyy", { locale: ptBR })}`)
-      }
-
-      // Enviar notificações (simulação ou integração real)
-      if (enviarNotificacoes) {
-        const responsaveisSelecionados = responsaveis.filter(r => r.selecionado)
-        console.log(`Notificações enviadas para ${responsaveisSelecionados.length} responsáveis`)
-      }
-
-      // Notificar componente pai
+      // Notificar o componente pai sobre a nova licitação
       if (onLicitacaoAdded) {
-        onLicitacaoAdded(novaLicitacao)
+        onLicitacaoAdded(data)
       }
 
-      // Resetar formulário
+      // Limpar o formulário
       setFormData({
         nome: "",
         orgao: "",
@@ -315,7 +396,7 @@ export function NovaLicitacao({ onLicitacaoAdded }: NovaLicitacaoProps) {
                 <Input
                   id="orgao"
                   name="orgao"
-                  placeholder="Nome do órgão"
+                  placeholder="Nome do órgão responsável"
                   value={formData.orgao}
                   onChange={handleInputChange}
                   required
@@ -517,25 +598,63 @@ export function NovaLicitacao({ onLicitacaoAdded }: NovaLicitacaoProps) {
               </div>
             </div>
 
-            <div className="space-y-2">
-              <Label>Anexar Documentos</Label>
-              <div className="border rounded-md p-3">
-                <Input type="file" multiple className="cursor-pointer" onChange={handleFileChange} />
+            <div className="border rounded-md p-4 space-y-4">
+              <div className="flex items-center gap-2">
+                <FileText className="h-5 w-5 text-blue-500" />
+                <h3 className="font-medium">Anexar Documentos</h3>
+              </div>
 
-                {arquivosAnexados.length > 0 && (
-                  <div className="mt-4 space-y-2">
-                    <Label>Arquivos Anexados:</Label>
-                    <div className="space-y-2">
-                      {arquivosAnexados.map((arquivo, index) => (
-                        <div key={index} className="flex items-center gap-2 text-sm">
-                          <FileText className="h-4 w-4 text-blue-500" />
-                          <span>{arquivo.name}</span>
-                          <span className="text-muted-foreground">({(arquivo.size / 1024).toFixed(2)} KB)</span>
-                        </div>
-                      ))}
-                    </div>
+              <Input
+                type="file"
+                onChange={handleFileChange}
+                multiple
+                className="p-2"
+              />
+
+              {arquivosAnexados.length > 0 && (
+                <div className="space-y-3 border-t pt-3">
+                  <h4 className="text-sm font-medium">Arquivos Selecionados</h4>
+                  <ul className="space-y-1 text-sm">
+                    {arquivosAnexados.map((file, index) => (
+                      <li key={index} className="flex items-center gap-2">
+                        <FileText className="h-4 w-4" />
+                        <span className="truncate max-w-[250px]">{file.name}</span>
+                        <span className="text-xs text-muted-foreground">
+                          ({Math.round(file.size / 1024)} KB)
+                        </span>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-6 w-6 p-0 text-red-500 hover:text-red-700"
+                          onClick={() => {
+                            setArquivosAnexados(prev => prev.filter((_, i) => i !== index));
+                          }}
+                        >
+                          ×
+                        </Button>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              {isUploading && (
+                <div className="space-y-2">
+                  <div className="flex justify-between text-xs">
+                    <span>Enviando documentos...</span>
+                    <span>{uploadProgress}%</span>
                   </div>
-                )}
+                  <div className="w-full h-2 bg-gray-200 rounded-full overflow-hidden">
+                    <div 
+                      className="h-full bg-blue-600 transition-all" 
+                      style={{ width: `${uploadProgress}%` }}
+                    />
+                  </div>
+                </div>
+              )}
+
+              <div className="flex items-center gap-1 text-sm text-muted-foreground">
+                <span>Os documentos serão anexados após criar a licitação</span>
               </div>
             </div>
           </TabsContent>

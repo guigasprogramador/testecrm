@@ -10,6 +10,9 @@ import { DetalhesCliente } from "@/components/detalhes-cliente"
 import { FiltroOportunidadesOtimizado, OportunidadeFiltros } from "@/components/comercial/filtro-oportunidades-otimizado"
 // Primeiro, vamos importar o componente NovaOportunidade
 import { NovaOportunidade } from "@/components/nova-oportunidade"
+
+// Importar hook para estatísticas
+import { useEstatisticas } from "@/hooks/comercial"
 // Importe o novo componente KanbanBoard:
 import { KanbanBoard } from "@/components/comercial/kanban-board"
 // Importar componentes para o menu de ações
@@ -33,9 +36,12 @@ import { Oportunidade as OportunidadeTipo, Cliente as ClienteTipo, OportunidadeS
 import { NovoCliente } from "@/components/comercial/novo-cliente"
 import { AgendarReuniao } from "@/components/comercial/agendar-reuniao"
 import { EditarOportunidade } from "@/components/comercial/editar-oportunidade"
+import { ListaClientes } from "@/components/comercial/lista-clientes"
+import { EditarCliente } from "@/components/comercial/editar-cliente"
 
 export default function ComercialPage() {
   // Usar os hooks do backend
+  const { estatisticas, fetchEstatisticas, setEstatisticas } = useEstatisticas();
   const {
     oportunidades,
     isLoading: isLoadingOportunidades,
@@ -82,16 +88,22 @@ export default function ComercialPage() {
   const [showEditarModal, setShowEditarModal] = useState(false)
   const [tempOportunidade, setTempOportunidade] = useState<OportunidadeTipo | null>(null)
 
+  const [clientesList, setClientesList] = useState<ClienteTipo[]>([])
+  const [clienteSelecionado, setClienteSelecionado] = useState<ClienteTipo | null>(null)
+  const [showEditarCliente, setShowEditarCliente] = useState(false)
+  const [loading, setLoading] = useState(false)
+
   // Atualizar oportunidades filtradas quando as oportunidades mudarem
   useEffect(() => {
     setFilteredOportunidades(oportunidades);
   }, [oportunidades]);
 
-  // Carregar oportunidades e clientes na inicialização
+  // Carregar oportunidades, clientes e estatísticas na inicialização
   useEffect(() => {
     console.log("Carregando dados iniciais...");
     fetchOportunidades();
     fetchClientes();
+    fetchEstatisticas();
   }, []);
 
   // Função para aplicar filtros otimizados
@@ -207,6 +219,34 @@ export default function ComercialPage() {
   const handleUpdateStatus = async (id: string, newStatus: OportunidadeStatus) => {
     try {
       await updateOportunidadeStatus(id, newStatus);
+      
+      // Forçar uma atualização completa das estatísticas com um delay para garantir que o backend processou a mudança
+      setTimeout(async () => {
+        // Forçar um novo fetch com opções que impedem qualquer tipo de cache
+        const novaEstatisticas = await fetch('/api/comercial/estatisticas', {
+          method: 'GET',
+          cache: 'no-store',
+          headers: {
+            'Cache-Control': 'no-cache, no-store, must-revalidate',
+            'Pragma': 'no-cache',
+            'Expires': '0',
+            'X-Timestamp': Date.now().toString()
+          }
+        }).then(res => res.json());
+        
+        // Atualizar manualmente as estatísticas
+        setEstatisticas(novaEstatisticas);
+        
+        // Recarregar as oportunidades para manter a lista atualizada
+        await fetchOportunidades();
+        
+        console.log("Estatísticas atualizadas após mudança de status:", novaEstatisticas);
+      }, 300); // Pequeno delay para garantir que o backend processou a mudança
+      
+      toast({
+        title: "Status atualizado",
+        description: "Status da oportunidade atualizado com sucesso.",
+      });
     } catch (error) {
       toast({
         title: "Erro",
@@ -268,15 +308,19 @@ export default function ComercialPage() {
   };
 
   // Função para visualizar detalhes do cliente
-  const handleClienteClick = async (clienteId: string) => {
+  const handleClienteClick = async (clienteIdOuNome: string) => {
     try {
       // Verificar primeiro se o cliente está no estado atual
-      let clienteEncontrado = clientes.find((c) => c.id === clienteId);
+      // Buscar por ID ou por nome
+      let clienteEncontrado = clientes.find(
+        (c) => c.id === clienteIdOuNome || c.nome === clienteIdOuNome
+      );
       
       // Se não encontrado no estado, tentar buscar na API
       if (!clienteEncontrado) {
+        // Primeiro tentar buscar por ID (assumindo que pode ser um ID)
         try {
-          const response = await fetch(`/api/comercial/clientes/${clienteId}`);
+          const response = await fetch(`/api/comercial/clientes/${clienteIdOuNome}`);
           if (response.ok) {
             clienteEncontrado = await response.json();
           }
@@ -293,7 +337,7 @@ export default function ComercialPage() {
               
               // Tentar encontrar por ID ou nome
               clienteEncontrado = todosClientes.find(
-                (c: ClienteTipo) => c.id === clienteId || c.nome === clienteId
+                (c: ClienteTipo) => c.id === clienteIdOuNome || c.nome === clienteIdOuNome
               );
               
               if (clienteEncontrado) {
@@ -383,25 +427,216 @@ export default function ComercialPage() {
     setShowMeetingModal(true);
   };
 
-  // Função para atualizar cliente
-  const handleClienteUpdate = (cliente: ClienteTipo) => {
-    console.log("Atualizando cliente:", cliente);
-    // Implementar atualização do cliente
-    toast({
-      title: "Cliente atualizado",
-      description: "O cliente foi atualizado com sucesso."
-    });
+  // Função para atualizar cliente (legacy) - será removida após migração completa
+  const handleClienteUpdateLegacy = (cliente: ClienteTipo) => {
+    console.log("Atualizando cliente (método legacy):", cliente);
+    // Redirecionar para a implementação atual
+    handleSalvarCliente(cliente);
   };
 
-  // Função para excluir cliente
-  const handleClienteDelete = (cliente: ClienteTipo) => {
-    console.log("Excluindo cliente:", cliente);
-    // Implementar exclusão do cliente
-    toast({
-      title: "Cliente excluído",
-      description: "O cliente foi excluído com sucesso."
-    });
+  // Função legacy para excluir cliente (mantida para compatibilidade)
+  const handleClienteDeleteLegacy = (cliente: ClienteTipo) => {
+    console.log("Excluindo cliente (método legacy):", cliente);
+    // Redirecionar para a implementação atual se o cliente tiver ID
+    if (cliente.id) {
+      handleClienteDelete(cliente.id);
+    } else {
+      toast({
+        title: "Erro",
+        description: "Não foi possível excluir o cliente: ID não encontrado.",
+        variant: "destructive"
+      });
+    }
   };
+
+  // Carregar clientes ao iniciar a página
+  useEffect(() => {
+    const carregarClientes = async () => {
+      setLoading(true)
+      try {
+        const response = await fetch('/api/comercial/clientes')
+        if (!response.ok) {
+          throw new Error('Erro ao carregar clientes')
+        }
+        const data = await response.json()
+        setClientesList(data)
+      } catch (error) {
+        console.error('Erro ao carregar clientes:', error)
+        toast({
+          title: 'Erro',
+          description: 'Não foi possível carregar a lista de clientes.',
+          variant: 'destructive'
+        })
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    carregarClientes()
+  }, [])
+
+  // Handler para clicar em um cliente (exibir detalhes)
+  const handleClienteListClick = async (clienteId: string) => {
+    try {
+      const response = await fetch(`/api/comercial/clientes/${clienteId}`)
+      if (!response.ok) {
+        throw new Error('Cliente não encontrado')
+      }
+
+      const cliente = await response.json()
+      setClienteSelecionado(cliente)
+      
+      // Buscar oportunidades do cliente
+      const responseOp = await fetch(`/api/comercial/oportunidades?clienteId=${clienteId}`)
+      if (responseOp.ok) {
+        const oportunidadesCliente = await responseOp.json()
+        setFilteredOportunidades(oportunidadesCliente)
+      }
+      
+      setClienteDetailsOpen(true)
+    } catch (error) {
+      console.error('Erro ao buscar detalhes do cliente:', error)
+      toast({
+        title: 'Erro',
+        description: 'Não foi possível carregar os detalhes do cliente.',
+        variant: 'destructive'
+      })
+    }
+  }
+
+  // Handler para adicionar um novo cliente
+  const handleNovoClienteAdded = async (cliente: Partial<ClienteTipo>) => {
+    try {
+      const response = await fetch('/api/comercial/clientes', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(cliente)
+      })
+
+      if (!response.ok) {
+        throw new Error('Erro ao cadastrar cliente')
+      }
+
+      const novoCliente = await response.json()
+      
+      // Atualizar a lista de clientes
+      setClientesList(prev => [...prev, novoCliente])
+      
+      toast({
+        title: 'Cliente adicionado',
+        description: `${novoCliente.nome} foi adicionado com sucesso!`
+      })
+      
+      return Promise.resolve()
+    } catch (error) {
+      console.error('Erro ao adicionar cliente:', error)
+      toast({
+        title: 'Erro',
+        description: 'Não foi possível cadastrar o cliente.',
+        variant: 'destructive'
+      })
+      
+      return Promise.reject(error)
+    }
+  }
+
+  // Handler para editar um cliente
+  const handleClienteUpdate = (cliente: ClienteTipo) => {
+    setClienteSelecionado(cliente)
+    setShowEditarCliente(true)
+  }
+
+  // Handler para salvar as alterações de um cliente
+  const handleSalvarCliente = async (cliente: ClienteTipo) => {
+    try {
+      const response = await fetch(`/api/comercial/clientes/${cliente.id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(cliente)
+      })
+
+      if (!response.ok) {
+        throw new Error('Erro ao atualizar cliente')
+      }
+
+      const clienteAtualizado = await response.json()
+      
+      // Atualizar a lista de clientes
+      setClientesList(prev => 
+        prev.map(c => c.id === clienteAtualizado.id ? clienteAtualizado : c)
+      )
+      
+      // Atualizar cliente selecionado se estiver aberto
+      if (clienteSelecionado?.id === clienteAtualizado.id) {
+        setClienteSelecionado(clienteAtualizado)
+      }
+      
+      setShowEditarCliente(false)
+      
+      toast({
+        title: 'Cliente atualizado',
+        description: `${clienteAtualizado.nome} foi atualizado com sucesso!`
+      })
+    } catch (error) {
+      console.error('Erro ao atualizar cliente:', error)
+      toast({
+        title: 'Erro',
+        description: 'Não foi possível atualizar o cliente.',
+        variant: 'destructive'
+      })
+    }
+  }
+
+  // Handler para excluir um cliente
+  const handleClienteDelete = async (clienteId: string) => {
+  // Buscar o cliente na lista atual
+  const clienteParaExcluir = clientesList.find(c => c.id === clienteId);
+  if (!clienteParaExcluir) {
+    toast({
+      title: 'Erro',
+      description: 'Cliente não encontrado.',
+      variant: 'destructive'
+    });
+    return;
+  }
+
+  // Confirmar exclusão (usando window.confirm para garantir compatibilidade)
+  if (!window.confirm(`Tem certeza que deseja excluir o cliente ${clienteParaExcluir.nome}?`)) {
+    return;
+  }
+
+  try {
+    // Excluir cliente
+    const response = await fetch(`/api/comercial/clientes/${clienteId}`, {
+      method: 'DELETE'
+    });
+
+    // Verificar se a resposta foi bem-sucedida
+    if (!response.ok) {
+      throw new Error(`Erro ao excluir cliente: ${response.status}`);
+    }
+
+    // Remover o cliente da lista
+    setClientesList(prev => prev.filter(c => c.id !== clienteId));
+
+    toast({
+      title: 'Sucesso',
+      description: 'Cliente excluído com sucesso.',
+      variant: 'default'
+    });
+  } catch (error) {
+    console.error('Erro ao excluir cliente:', error);
+    toast({
+      title: 'Erro',
+      description: 'Não foi possível excluir o cliente.',
+      variant: 'destructive'
+    });
+  }
+};
 
   // Renderização condicional para estado de carregamento
   if (isLoadingOportunidades && oportunidades.length === 0) {
@@ -430,22 +665,32 @@ export default function ComercialPage() {
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 mb-8">
         <Card>
           <CardContent className="p-6">
-            <div className="text-3xl font-bold">38</div>
+            <div className="text-3xl font-bold max-w-full overflow-hidden text-ellipsis">
+              {/* Calcular leads em aberto diretamente a partir das oportunidades carregadas */}
+              {oportunidades.filter(op => 
+                op.status !== 'fechado_ganho' && 
+                op.status !== 'fechado_perdido'
+              ).length || 0}
+            </div>
             <div className="text-sm text-muted-foreground">Leads em aberto</div>
           </CardContent>
         </Card>
 
         <Card>
           <CardContent className="p-6">
-            <div className="text-3xl font-bold">83</div>
+            <div className="text-3xl font-bold max-w-full overflow-hidden text-ellipsis">
+              {estatisticas?.estatisticasPorStatus?.fechado_ganho || 0}
+            </div>
             <div className="text-sm text-muted-foreground">Propostas aceitas</div>
           </CardContent>
         </Card>
 
         <Card>
           <CardContent className="p-6">
-            <div className="text-3xl font-bold">
-              12.000,00
+            <div className="text-3xl font-bold max-w-full overflow-hidden text-ellipsis">
+              {estatisticas?.valorTotalNegociacao 
+                ? `R$ ${formatarValorMonetario(estatisticas.valorTotalNegociacao)}`
+                : 'R$ 0'}
             </div>
             <div className="text-sm text-muted-foreground">Total em negociação</div>
           </CardContent>
@@ -453,15 +698,19 @@ export default function ComercialPage() {
 
         <Card>
           <CardContent className="p-6">
-            <div className="text-3xl font-bold">86%</div>
+            <div className="text-3xl font-bold max-w-full overflow-hidden text-ellipsis">
+              {estatisticas?.taxaConversao ? `${estatisticas.taxaConversao}%` : '0%'}
+            </div>
             <div className="text-sm text-muted-foreground">Taxa de conversão</div>
           </CardContent>
         </Card>
 
         <Card>
           <CardContent className="p-6">
-            <div className="text-3xl font-bold">46</div>
-            <div className="text-sm text-muted-foreground">Tempo de fechamento</div>
+            <div className="text-3xl font-bold max-w-full overflow-hidden text-ellipsis">
+              {estatisticas?.estatisticasPorStatus?.fechado_ganho || 0}
+            </div>
+            <div className="text-sm text-muted-foreground">Oportunidades ganhas</div>
           </CardContent>
         </Card>
       </div>
@@ -473,6 +722,13 @@ export default function ComercialPage() {
             <div className="flex items-center space-x-2">
               <Button
                 size="sm"
+                onClick={() => setActiveTab("lista")}
+                variant={activeTab === "lista" ? "default" : "outline"}
+              >
+                Lista de Oportunidades
+              </Button>
+              <Button
+                size="sm"
                 onClick={() => setActiveTab("kanban")}
                 variant={activeTab === "kanban" ? "default" : "outline"}
               >
@@ -480,10 +736,10 @@ export default function ComercialPage() {
               </Button>
               <Button
                 size="sm"
-                onClick={() => setActiveTab("lista")}
-                variant={activeTab === "lista" ? "default" : "outline"}
+                onClick={() => setActiveTab("clientes")}
+                variant={activeTab === "clientes" ? "default" : "outline"}
               >
-                Lista
+                Clientes
               </Button>
             </div>
 
@@ -658,9 +914,20 @@ export default function ComercialPage() {
                 onUpdateStatus={(id: string, newStatus: string) => {
                   // Convert string to OportunidadeStatus
                   handleUpdateStatus(id, newStatus as OportunidadeStatus);
-                }} 
+                }}
+                onClienteClick={handleClienteClick}
               />
             </div>
+          </TabsContent>
+
+          <TabsContent value="clientes">
+            <ListaClientes 
+              clientes={clientesList}
+              onClienteClick={handleClienteListClick}
+              onClienteAdded={handleNovoClienteAdded}
+              onClienteEditar={handleClienteUpdate}
+              onClienteDelete={handleClienteDelete}
+            />
           </TabsContent>
         </Tabs>
       </div>
@@ -694,9 +961,28 @@ export default function ComercialPage() {
           open={clienteDetailsOpen}
           onOpenChange={setClienteDetailsOpen}
           onClienteUpdate={handleClienteUpdate}
-          onClienteDelete={handleClienteDelete}
+          onClienteDelete={handleClienteDeleteLegacy}
           onOportunidadeClick={(oportunidade) => handleOportunidadeClick(oportunidade.id)}
         />
+      )}
+
+      {/* Modal para editar cliente */}
+      {clienteSelecionado && (
+        <Dialog open={showEditarCliente} onOpenChange={setShowEditarCliente}>
+          <DialogContent className="sm:max-w-[600px]">
+            <DialogHeader>
+              <DialogTitle>Editar Cliente</DialogTitle>
+              <DialogDescription>
+                Atualize as informações do cliente
+              </DialogDescription>
+            </DialogHeader>
+            <EditarCliente 
+              cliente={clienteSelecionado} 
+              onSalvar={handleSalvarCliente} 
+              onCancel={() => setShowEditarCliente(false)}
+            />
+          </DialogContent>
+        </Dialog>
       )}
 
       {/* Modal de Envio de Email */}
@@ -923,4 +1209,19 @@ function getStatusLabel(status: OportunidadeStatus): string {
   }
 
   return statusLabels[status] || status
+}
+
+function formatarValorMonetario(valor: number): string {
+  // Para valores acima de 1 milhão, usar formato simplificado
+  if (valor >= 1000000) {
+    return `${(valor / 1000000).toFixed(1)}M`;
+  }
+  // Para valores acima de 1000, usar formato em K
+  else if (valor >= 1000) {
+    return `${(valor / 1000).toFixed(1)}K`;
+  }
+  // Para valores menores, usar formato normal
+  else {
+    return valor.toLocaleString('pt-BR');
+  }
 }

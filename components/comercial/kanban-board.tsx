@@ -15,6 +15,7 @@ interface Oportunidade {
 interface KanbanBoardProps {
   oportunidades: Oportunidade[]
   onUpdateStatus: (id: string, newStatus: string) => void
+  onClienteClick?: (clienteId: string) => void
 }
 
 const columns = [
@@ -27,7 +28,7 @@ const columns = [
   { id: "fechado_perdido", title: "Fechado (Perdido)" },
 ]
 
-export function KanbanBoard({ oportunidades, onUpdateStatus }: KanbanBoardProps) {
+export function KanbanBoard({ oportunidades, onUpdateStatus, onClienteClick }: KanbanBoardProps) {
   // Função para obter oportunidades por status
   const getOportunidadesByStatus = (status: string) => {
     return oportunidades.filter((op) => op.status === status)
@@ -102,7 +103,19 @@ export function KanbanBoard({ oportunidades, onUpdateStatus }: KanbanBoardProps)
                             {oportunidade.titulo}
                           </h4>
                           <p className="text-xs text-gray-500 mb-1 truncate" title={oportunidade.cliente}>
-                            {oportunidade.cliente}
+                            {onClienteClick ? (
+                              <button 
+                                className="text-blue-600 hover:underline focus:outline-none"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  onClienteClick(oportunidade.cliente);
+                                }}
+                              >
+                                {oportunidade.cliente}
+                              </button>
+                            ) : (
+                              oportunidade.cliente
+                            )}
                           </p>
                           <div className="flex justify-between items-center flex-wrap gap-1">
                             <span className="text-xs font-semibold">{oportunidade.valor}</span>

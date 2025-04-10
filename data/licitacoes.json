@@ -4,7 +4,7 @@
     "titulo": "Aquisição de Equipamentos de Informática",
     "orgao": "Prefeitura Municipal",
     "orgaoId": "org1",
-    "status": "analise_edital",
+    "status": "analise_interna",
     "dataAbertura": "2023-07-15",
     "dataPublicacao": "2023-06-30",
     "valorEstimado": 250000,
@@ -29,7 +29,7 @@
     "contatoTelefone": "(11) 3333-4444",
     "dataJulgamento": "2023-07-20",
     "dataCriacao": "2023-06-15T10:30:00Z",
-    "dataAtualizacao": "2025-03-28T19:52:44.717Z",
+    "dataAtualizacao": "2025-04-08T01:17:56.630Z",
     "documentos": [
       {
         "id": "doc1",
@@ -107,7 +107,7 @@
     "titulo": "Fornecimento de Licenças de Software",
     "orgao": "Ministério da Educação",
     "orgaoId": "org3",
-    "status": "vencida",
+    "status": "assinaturas",
     "dataAbertura": "2023-06-10",
     "dataPublicacao": "2023-05-20",
     "valorEstimado": 320000,
@@ -132,7 +132,7 @@
     "contatoTelefone": "(61) 3333-2222",
     "dataJulgamento": "2023-06-15",
     "dataCriacao": "2023-05-05T11:20:00Z",
-    "dataAtualizacao": "2023-06-20T16:15:00Z",
+    "dataAtualizacao": "2025-04-08T01:18:07.080Z",
     "documentos": [
       {
         "id": "doc5",
@@ -150,7 +150,7 @@
     "titulo": "Implementação de Sistema de Gestão Hospitalar",
     "orgao": "Secretaria de Saúde",
     "orgaoId": "org4",
-    "status": "envio_documentos",
+    "status": "vencida",
     "dataAbertura": "2023-09-05",
     "dataPublicacao": "2023-08-15",
     "valorEstimado": 780000,
@@ -174,7 +174,7 @@
     "contatoTelefone": "(11) 5555-6666",
     "dataJulgamento": "2023-09-10",
     "dataCriacao": "2023-08-01T09:10:00Z",
-    "dataAtualizacao": "2023-09-06T15:30:00Z",
+    "dataAtualizacao": "2025-04-08T01:18:01.435Z",
     "documentos": [
       {
         "id": "doc6",

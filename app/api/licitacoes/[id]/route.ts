@@ -1,64 +1,75 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { Licitacao, Documento } from '@/types/licitacoes';
-import * as fs from 'fs';
-import * as path from 'path';
+import { Licitacao } from '@/types/licitacoes';
+import { crmonefactory } from '@/lib/supabase/client';
 
-// Path to our "database" JSON file
-const dbPath = path.join(process.cwd(), 'data', 'licitacoes.json');
-
-// Função para carregar os dados do arquivo JSON
-async function carregarLicitacoes(): Promise<Licitacao[]> {
-  try {
-    // Ensure directory exists
-    const dir = path.dirname(dbPath);
-    if (!fs.existsSync(dir)) {
-      fs.mkdirSync(dir, { recursive: true });
-    }
-    
-    // Create file if it doesn't exist
-    if (!fs.existsSync(dbPath)) {
-      // Import default data from the route module
-      const routeModule = await import('../route');
-      // @ts-ignore - We know this property exists
-      const initLicitacoesCache = routeModule.initLicitacoesCache;
-      if (typeof initLicitacoesCache === 'function') {
-        const licitacoes = await initLicitacoesCache();
-        return licitacoes;
+// Função auxiliar para formatar dados do banco para o formato do frontend
+function formatarLicitacao(item: any): Licitacao {
+  const orgao = item.orgaos || {};
+  
+  // Processar responsáveis, se houverem
+  const responsaveisIds: string[] = [];
+  if (item.licitacao_responsaveis && item.licitacao_responsaveis.length > 0) {
+    item.licitacao_responsaveis.forEach((resp: any) => {
+      if (resp.usuario_id) {
+        responsaveisIds.push(resp.usuario_id);
       }
-      return [];
-    }
-    
-    // Read from file
-    const data = fs.readFileSync(dbPath, 'utf8');
-    return JSON.parse(data);
-  } catch (error) {
-    console.error('Erro ao carregar licitações:', error);
-    return [];
+    });
   }
-}
-
-// Função para salvar os dados no arquivo JSON
-async function salvarLicitacoes(licitacoes: Licitacao[]): Promise<void> {
-  try {
-    const dir = path.dirname(dbPath);
-    if (!fs.existsSync(dir)) {
-      fs.mkdirSync(dir, { recursive: true });
-    }
-    fs.writeFileSync(dbPath, JSON.stringify(licitacoes, null, 2));
-    
-    // Atualizar o cache na rota principal, se possível
-    try {
-      const routeModule = await import('../route');
-      // @ts-ignore - We know this property exists
-      if (routeModule.updateLicitacoesCache && typeof routeModule.updateLicitacoesCache === 'function') {
-        await routeModule.updateLicitacoesCache(licitacoes);
-      }
-    } catch (e) {
-      console.error('Erro ao atualizar cache:', e);
-    }
-  } catch (error) {
-    console.error('Erro ao salvar licitações:', error);
-  }
+  
+  // Processar documentos, se houverem
+  const documentos = item.documentos || [];
+  
+  return {
+    id: item.id,
+    titulo: item.titulo,
+    orgao: orgao.nome || '',
+    orgaoId: item.orgao_id,
+    status: item.status,
+    dataAbertura: item.data_abertura,
+    dataPublicacao: item.data_publicacao,
+    valorEstimado: item.valor_estimado,
+    valorProposta: item.valor_proposta,
+    modalidade: item.modalidade,
+    objeto: item.objeto,
+    edital: item.edital,
+    numeroEdital: item.numero_edital,
+    responsavel: item.responsavel || '',
+    responsavelId: item.responsavel_id,
+    responsaveisIds: responsaveisIds,
+    prazo: item.prazo,
+    urlLicitacao: item.url_licitacao,
+    urlEdital: item.url_edital,
+    descricao: item.descricao,
+    formaPagamento: item.forma_pagamento,
+    obsFinanceiras: item.obs_financeiras,
+    tipo: item.tipo,
+    tipoFaturamento: item.tipo_faturamento,
+    margemLucro: item.margem_lucro,
+    contatoNome: item.contato_nome,
+    contatoEmail: item.contato_email,
+    contatoTelefone: item.contato_telefone,
+    dataJulgamento: item.data_julgamento,
+    dataCriacao: item.data_criacao,
+    dataAtualizacao: item.data_atualizacao,
+    documentos: documentos.map((doc: any) => ({
+      id: doc.id,
+      nome: doc.nome,
+      url: doc.url,
+      arquivo: doc.arquivo,
+      dataCriacao: doc.data_criacao,
+      dataAtualizacao: doc.data_atualizacao,
+      tipo: doc.tipo,
+      tamanho: doc.tamanho,
+      licitacaoId: doc.licitacao_id,
+      formato: doc.formato,
+      categoria: doc.categoria,
+      categoriaId: doc.categoria_id,
+      uploadPor: doc.upload_por,
+      resumo: doc.resumo,
+      dataValidade: doc.data_validade,
+      status: doc.status
+    }))
+  };
 }
 
 // GET - Obter uma licitação específica pelo ID
@@ -67,23 +78,45 @@ export async function GET(
   { params }: { params: { id: string } }
 ) {
   try {
-    const licitacoes = await carregarLicitacoes();
-    
     const id = params.id;
-    const licitacao = licitacoes.find(l => l.id === id);
     
-    if (!licitacao) {
+    // Buscar a licitação com suas relações
+    const { data, error } = await crmonefactory
+      .from('licitacoes')
+      .select(`
+        *,
+        orgaos (id, nome, cnpj, cidade, estado),
+        licitacao_responsaveis (
+          id,
+          papel,
+          usuario_id,
+          usuarios (id, nome)
+        ),
+        documentos (id, nome, url, tipo, categoria_id)
+      `)
+      .eq('id', id)
+      .single();
+    
+    if (error) {
+      console.error('Erro ao buscar licitação:', error);
+      return NextResponse.json(
+        { error: 'Erro ao buscar licitação: ' + error.message },
+        { status: error.code === 'PGRST116' ? 404 : 500 }
+      );
+    }
+    
+    if (!data) {
       return NextResponse.json(
         { error: 'Licitação não encontrada' },
         { status: 404 }
       );
     }
     
-    return NextResponse.json(licitacao);
+    return NextResponse.json(formatarLicitacao(data));
   } catch (error) {
     console.error('Erro ao buscar licitação:', error);
     return NextResponse.json(
-      { error: 'Erro ao buscar licitação' },
+      { error: 'Erro interno ao buscar licitação' },
       { status: 500 }
     );
   }
@@ -95,50 +128,141 @@ export async function PUT(
   { params }: { params: { id: string } }
 ) {
   try {
-    const licitacoes = await carregarLicitacoes();
-    
     const id = params.id;
-    const index = licitacoes.findIndex(l => l.id === id);
-    
-    if (index === -1) {
-      return NextResponse.json(
-        { error: 'Licitação não encontrada' },
-        { status: 404 }
-      );
-    }
-    
     const data = await request.json();
     
     // Validação básica
-    if (!data.titulo || !data.orgao) {
+    if (!data.titulo || !data.orgaoId) {
       return NextResponse.json(
         { error: 'Título e órgão são obrigatórios' },
         { status: 400 }
       );
     }
     
-    // Data atual para campo de auditoria
-    const agora = new Date().toISOString();
+    // Extrair documentos e responsáveis para atualização separada
+    const { documentos, responsaveis, ...licitacaoData } = data;
     
-    // Manter o ID original e a data de criação
-    const licitacaoAtualizada: Licitacao = {
-      ...data,
-      id: id,
-      dataCriacao: licitacoes[index].dataCriacao,
-      dataAtualizacao: agora
+    // Preparar objeto para atualização (snake_case para o banco)
+    const licitacao = {
+      titulo: licitacaoData.titulo,
+      orgao_id: licitacaoData.orgaoId,
+      status: licitacaoData.status,
+      data_abertura: licitacaoData.dataAbertura,
+      data_publicacao: licitacaoData.dataPublicacao,
+      data_julgamento: licitacaoData.dataJulgamento,
+      valor_estimado: licitacaoData.valorEstimado,
+      valor_proposta: licitacaoData.valorProposta,
+      modalidade: licitacaoData.modalidade,
+      objeto: licitacaoData.objeto,
+      edital: licitacaoData.edital,
+      numero_edital: licitacaoData.numeroEdital,
+      responsavel_id: licitacaoData.responsavelId,
+      prazo: licitacaoData.prazo,
+      url_licitacao: licitacaoData.urlLicitacao,
+      url_edital: licitacaoData.urlEdital,
+      descricao: licitacaoData.descricao,
+      forma_pagamento: licitacaoData.formaPagamento,
+      obs_financeiras: licitacaoData.obsFinanceiras,
+      tipo: licitacaoData.tipo,
+      tipo_faturamento: licitacaoData.tipoFaturamento,
+      margem_lucro: licitacaoData.margemLucro,
+      contato_nome: licitacaoData.contatoNome,
+      contato_email: licitacaoData.contatoEmail,
+      contato_telefone: licitacaoData.contatoTelefone,
+      posicao_kanban: licitacaoData.posicaoKanban
     };
     
-    // Atualizar a licitação no array
-    licitacoes[index] = licitacaoAtualizada;
+    // Atualizar a licitação
+    const { data: licitacaoAtualizada, error } = await crmonefactory
+      .from('licitacoes')
+      .update(licitacao)
+      .eq('id', id)
+      .select()
+      .single();
     
-    // Salvar as alterações
-    await salvarLicitacoes(licitacoes);
+    if (error) {
+      console.error('Erro ao atualizar licitação:', error);
+      return NextResponse.json(
+        { error: 'Erro ao atualizar licitação: ' + error.message },
+        { status: error.code === 'PGRST116' ? 404 : 500 }
+      );
+    }
     
-    return NextResponse.json(licitacaoAtualizada);
+    // Tratar documentos, se houver
+    if (documentos && documentos.length > 0) {
+      // Primeiro, remove documentos existentes se necessário
+      await crmonefactory
+        .from('documentos')
+        .delete()
+        .eq('licitacao_id', id);
+      
+      // Depois, insere os novos documentos
+      const docsToInsert = documentos.map((doc: any) => ({
+        nome: doc.nome,
+        url: doc.url,
+        arquivo: doc.arquivo,
+        tipo: doc.tipo,
+        licitacao_id: id,
+        formato: doc.formato,
+        categoria_id: doc.categoriaId,
+        resumo: doc.resumo,
+        data_validade: doc.dataValidade,
+        upload_por: doc.uploadPor
+      }));
+      
+      await crmonefactory
+        .from('documentos')
+        .insert(docsToInsert);
+    }
+    
+    // Tratar responsáveis, se houver
+    if (responsaveis && responsaveis.length > 0) {
+      // Primeiro, remove responsáveis existentes
+      await crmonefactory
+        .from('licitacao_responsaveis')
+        .delete()
+        .eq('licitacao_id', id);
+      
+      // Depois, insere os novos responsáveis
+      const respsToInsert = responsaveis.map((resp: any) => ({
+        licitacao_id: id,
+        usuario_id: resp.usuarioId,
+        papel: resp.papel || 'colaborador'
+      }));
+      
+      await crmonefactory
+        .from('licitacao_responsaveis')
+        .insert(respsToInsert);
+    }
+    
+    // Buscar a licitação completa com as relações
+    const { data: licitacaoCompleta, error: fetchError } = await crmonefactory
+      .from('licitacoes')
+      .select(`
+        *,
+        orgaos (id, nome, cnpj, cidade, estado),
+        licitacao_responsaveis (
+          id,
+          papel,
+          usuario_id,
+          usuarios (id, nome)
+        ),
+        documentos (id, nome, url, tipo, categoria_id)
+      `)
+      .eq('id', id)
+      .single();
+    
+    if (fetchError) {
+      console.error('Erro ao buscar licitação completa:', fetchError);
+      // Retornar a licitação atualizada mesmo sem dados relacionados
+      return NextResponse.json(formatarLicitacao(licitacaoAtualizada));
+    }
+    
+    return NextResponse.json(formatarLicitacao(licitacaoCompleta));
   } catch (error) {
     console.error('Erro ao atualizar licitação:', error);
     return NextResponse.json(
-      { error: 'Erro ao atualizar licitação' },
+      { error: 'Erro interno ao atualizar licitação' },
       { status: 500 }
     );
   }
@@ -150,40 +274,121 @@ export async function PATCH(
   { params }: { params: { id: string } }
 ) {
   try {
-    const licitacoes = await carregarLicitacoes();
-    
     const id = params.id;
-    const index = licitacoes.findIndex(l => l.id === id);
+    const dadosAtualizacao = await request.json();
     
-    if (index === -1) {
+    // Converter campos do camelCase para snake_case
+    const camposParaAtualizar: Record<string, any> = {};
+    
+    // Mapeamento de camelCase para snake_case
+    Object.entries(dadosAtualizacao).forEach(([key, value]) => {
+      // Ignorar alguns campos especiais que não devem ser atualizados diretamente
+      if (['id', 'documentos', 'responsaveis', 'responsaveisIds'].includes(key)) {
+        return;
+      }
+      
+      // Converter camelCase para snake_case
+      const snakeKey = key.replace(/[A-Z]/g, letter => `_${letter.toLowerCase()}`);
+      camposParaAtualizar[snakeKey] = value;
+    });
+    
+    // Atualizar a licitação
+    const { data: licitacaoAtualizada, error } = await crmonefactory
+      .from('licitacoes')
+      .update(camposParaAtualizar)
+      .eq('id', id)
+      .select()
+      .single();
+    
+    if (error) {
+      console.error('Erro ao atualizar licitação:', error);
       return NextResponse.json(
-        { error: 'Licitação não encontrada' },
-        { status: 404 }
+        { error: 'Erro ao atualizar licitação: ' + error.message },
+        { status: error.code === 'PGRST116' ? 404 : 500 }
       );
     }
     
-    const data = await request.json();
-    const agora = new Date().toISOString();
+    // Atualizar os documentos se fornecidos
+    if (dadosAtualizacao.documentos) {
+      // Atualização parcial de documentos não exclui documentos existentes
+      // apenas adiciona novos documentos
+      const docsToInsert = dadosAtualizacao.documentos
+        .filter((doc: any) => !doc.id) // Apenas documentos novos
+        .map((doc: any) => ({
+          nome: doc.nome,
+          url: doc.url,
+          arquivo: doc.arquivo,
+          tipo: doc.tipo,
+          licitacao_id: id,
+          formato: doc.formato,
+          categoria_id: doc.categoriaId,
+          resumo: doc.resumo,
+          data_validade: doc.dataValidade,
+          upload_por: doc.uploadPor
+        }));
+      
+      if (docsToInsert.length > 0) {
+        await crmonefactory
+          .from('documentos')
+          .insert(docsToInsert);
+      }
+    }
     
-    // Atualizar apenas os campos fornecidos
-    const licitacaoAtualizada = {
-      ...licitacoes[index],
-      ...data,
-      id, // Garantir que o ID não seja alterado
-      dataCriacao: licitacoes[index].dataCriacao, // Manter a data de criação original
-      dataAtualizacao: agora
-    };
+    // Atualizar os responsáveis se fornecidos
+    if (dadosAtualizacao.responsaveis || dadosAtualizacao.responsaveisIds) {
+      const responsaveis = dadosAtualizacao.responsaveis || 
+        (dadosAtualizacao.responsaveisIds || []).map((userId: string) => ({
+          usuarioId: userId,
+          papel: 'colaborador'
+        }));
+      
+      if (responsaveis.length > 0) {
+        // Remover responsáveis existentes
+        await crmonefactory
+          .from('licitacao_responsaveis')
+          .delete()
+          .eq('licitacao_id', id);
+        
+        // Inserir novos responsáveis
+        const respsToInsert = responsaveis.map((resp: any) => ({
+          licitacao_id: id,
+          usuario_id: resp.usuarioId,
+          papel: resp.papel || 'colaborador'
+        }));
+        
+        await crmonefactory
+          .from('licitacao_responsaveis')
+          .insert(respsToInsert);
+      }
+    }
     
-    licitacoes[index] = licitacaoAtualizada;
+    // Buscar a licitação completa com as relações
+    const { data: licitacaoCompleta, error: fetchError } = await crmonefactory
+      .from('licitacoes')
+      .select(`
+        *,
+        orgaos (id, nome, cnpj, cidade, estado),
+        licitacao_responsaveis (
+          id,
+          papel,
+          usuario_id,
+          usuarios (id, nome)
+        ),
+        documentos (id, nome, url, tipo, categoria_id)
+      `)
+      .eq('id', id)
+      .single();
     
-    // Salvar as alterações
-    await salvarLicitacoes(licitacoes);
+    if (fetchError) {
+      console.error('Erro ao buscar licitação completa:', fetchError);
+      return NextResponse.json(formatarLicitacao(licitacaoAtualizada));
+    }
     
-    return NextResponse.json(licitacaoAtualizada);
+    return NextResponse.json(formatarLicitacao(licitacaoCompleta));
   } catch (error) {
     console.error('Erro ao atualizar licitação:', error);
     return NextResponse.json(
-      { error: 'Erro ao atualizar licitação' },
+      { error: 'Erro interno ao atualizar licitação' },
       { status: 500 }
     );
   }
@@ -195,29 +400,47 @@ export async function DELETE(
   { params }: { params: { id: string } }
 ) {
   try {
-    const licitacoes = await carregarLicitacoes();
-    
     const id = params.id;
-    const index = licitacoes.findIndex(l => l.id === id);
     
-    if (index === -1) {
+    // Primeiro, removemos os documentos relacionados
+    const { error: docError } = await crmonefactory
+      .from('documentos')
+      .delete()
+      .eq('licitacao_id', id);
+    
+    if (docError) {
+      console.error('Erro ao excluir documentos da licitação:', docError);
+    }
+    
+    // Depois, removemos os responsáveis relacionados
+    const { error: respError } = await crmonefactory
+      .from('licitacao_responsaveis')
+      .delete()
+      .eq('licitacao_id', id);
+    
+    if (respError) {
+      console.error('Erro ao excluir responsáveis da licitação:', respError);
+    }
+    
+    // Por fim, removemos a licitação
+    const { error } = await crmonefactory
+      .from('licitacoes')
+      .delete()
+      .eq('id', id);
+    
+    if (error) {
+      console.error('Erro ao excluir licitação:', error);
       return NextResponse.json(
-        { error: 'Licitação não encontrada' },
-        { status: 404 }
+        { error: 'Erro ao excluir licitação: ' + error.message },
+        { status: error.code === 'PGRST116' ? 404 : 500 }
       );
     }
     
-    // Remover a licitação do array
-    licitacoes.splice(index, 1);
-    
-    // Salvar as alterações
-    await salvarLicitacoes(licitacoes);
-    
-    return NextResponse.json({ success: true });
+    return NextResponse.json({ success: true, message: 'Licitação excluída com sucesso' });
   } catch (error) {
     console.error('Erro ao excluir licitação:', error);
     return NextResponse.json(
-      { error: 'Erro ao excluir licitação' },
+      { error: 'Erro interno ao excluir licitação' },
       { status: 500 }
     );
   }

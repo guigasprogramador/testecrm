@@ -105,7 +105,9 @@ export interface LicitacaoFiltros {
 
 export type LicitacaoStatus = 
   | "analise_interna"
+  | "analise_edital"
   | "aguardando_pregao"
+  | "em_andamento"
   | "envio_documentos"
   | "assinaturas"
   | "vencida"
@@ -115,7 +117,9 @@ export type LicitacaoStatus =
 
 export const statusLabels: Record<LicitacaoStatus, string> = {
   analise_interna: "Análise Interna",
+  analise_edital: "Análise de Edital",
   aguardando_pregao: "Aguardando Pregão",
+  em_andamento: "Em Andamento",
   envio_documentos: "Envio de Documentos",
   assinaturas: "Assinaturas",
   vencida: "Vencida",

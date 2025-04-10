@@ -64,32 +64,70 @@ export default function LicitacoesPage() {
       if (filtros.modalidade) params.append('modalidade', filtros.modalidade)
       if (filtros.dataInicio) params.append('dataInicio', filtros.dataInicio)
       if (filtros.dataFim) params.append('dataFim', filtros.dataFim)
-      if (filtros.valorMinimo) params.append('valorMinimo', filtros.valorMinimo.toString())
-      if (filtros.valorMaximo) params.append('valorMaximo', filtros.valorMaximo.toString())
+      if (filtros.valorMinimo) params.append('valorMin', filtros.valorMinimo.toString())
+      if (filtros.valorMaximo) params.append('valorMax', filtros.valorMaximo.toString())
       
-      const response = await fetch(`/api/licitacoes?${params.toString()}`)
+      // Obter token de autenticação
+      const accessToken = localStorage.getItem('accessToken');
+      
+      console.log('Buscando licitações com parâmetros:', params.toString())
+      const response = await fetch(`/api/licitacoes?${params.toString()}`, {
+        method: 'GET',
+        headers: {
+          'Cache-Control': 'no-cache',
+          'Pragma': 'no-cache',
+          'Authorization': `Bearer ${accessToken}`
+        }
+      })
       
       if (!response.ok) {
-        throw new Error('Erro ao carregar licitações')
+        const errorData = await response.text()
+        console.error('Resposta não-OK da API:', response.status, errorData)
+        throw new Error(`Resposta não-OK da API: ${response.status} "${errorData}"`)
       }
       
       const data = await response.json()
-      setLicitacoes(data)
-      setFilteredLicitacoes(data)
+      console.log('Dados recebidos da API:', data)
+      
+      // Verificar se os dados recebidos são um array
+      if (!Array.isArray(data)) {
+        console.error('Dados recebidos não são um array:', data)
+        setLicitacoes([])
+        setFilteredLicitacoes([])
+      } else {
+        setLicitacoes(data)
+        setFilteredLicitacoes(data)
+      }
 
       // Carregar estatísticas
-      const statsResponse = await fetch('/api/licitacoes?estatisticas=true')
-      if (statsResponse.ok) {
-        const statsData = await statsResponse.json()
-        setEstatisticas(statsData)
+      try {
+        const statsResponse = await fetch('/api/licitacoes?estatisticas=true', {
+          method: 'GET',
+          headers: {
+            'Cache-Control': 'no-cache',
+            'Pragma': 'no-cache',
+            'Authorization': `Bearer ${accessToken}`
+          }
+        })
+        
+        if (statsResponse.ok) {
+          const statsData = await statsResponse.json()
+          setEstatisticas(statsData)
+        } else {
+          console.error('Erro ao buscar estatísticas:', statsResponse.status)
+        }
+      } catch (statsError) {
+        console.error('Erro ao processar estatísticas:', statsError)
       }
     } catch (error) {
       console.error('Erro ao carregar licitações:', error)
       toast({
         title: "Erro",
-        description: "Não foi possível carregar as licitações.",
+        description: "Não foi possível carregar as licitações. Verifique o console para mais detalhes.",
         variant: "destructive"
       })
+      setLicitacoes([])
+      setFilteredLicitacoes([])
     } finally {
       setLoading(false)
     }
@@ -255,16 +293,37 @@ export default function LicitacoesPage() {
     if (!licitacao) return
     
     try {
+      // Obter token de autenticação
+      const accessToken = localStorage.getItem('accessToken');
+      
+      if (!accessToken) {
+        console.error('Token de autenticação não encontrado');
+        toast({
+          title: "Erro de autenticação",
+          description: "Você precisa estar autenticado para realizar esta ação.",
+          variant: "destructive"
+        });
+        return;
+      }
+      
+      console.log(`Atualizando status da licitação ${id} para ${newStatus}`);
+      
       const response = await fetch(`/api/licitacoes/${id}`, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
+          'Authorization': `Bearer ${accessToken}`,
+          'Cache-Control': 'no-cache',
+          'Pragma': 'no-cache'
         },
         body: JSON.stringify({ status: newStatus }),
       })
       
+      // Verificar resposta detalhada em caso de erro
       if (!response.ok) {
-        throw new Error('Erro ao atualizar status da licitação')
+        const errorText = await response.text();
+        console.error(`Erro na resposta da API: ${response.status} - ${errorText}`);
+        throw new Error(`Erro ao atualizar status da licitação: ${response.status} ${errorText}`)
       }
       
       // Atualizar localmente para feedback imediato ao usuário

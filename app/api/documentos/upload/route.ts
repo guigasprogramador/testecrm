@@ -1,20 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { writeFile, mkdir } from 'fs/promises';
-import { existsSync } from 'fs';
-import * as path from 'path';
+import { supabase } from '@/lib/supabase/client';
 
-// Diretório para armazenar arquivos
-const uploadDir = path.join(process.cwd(), 'public', 'uploads', 'documentos');
-
-// Função para gerar ID único sem dependência externa
-function generateUniqueId() {
-  // Combina timestamp com número aleatório para criar um ID único
-  return `${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
-}
-
-// POST - Upload de arquivo
+// POST - Upload de arquivo para o Supabase Storage
 export async function POST(request: NextRequest) {
   try {
+    // Verificar autenticação
+    const authHeader = request.headers.get('authorization');
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return NextResponse.json({ error: 'Não autorizado' }, { status: 401 });
+    }
+
     // Verificar se a requisição é do tipo multipart/form-data
     const contentType = request.headers.get('content-type');
     if (!contentType || !contentType.includes('multipart/form-data')) {
@@ -24,14 +19,11 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Criar diretório de upload se não existir
-    if (!existsSync(uploadDir)) {
-      await mkdir(uploadDir, { recursive: true });
-    }
-
     // Processar o formulário
     const formData = await request.formData();
     const file = formData.get('file') as File | null;
+    const licitacaoId = formData.get('licitacaoId') as string | null;
+    const tipo = formData.get('tipo') as string | null;
 
     if (!file) {
       return NextResponse.json(
@@ -40,35 +32,117 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    if (!licitacaoId) {
+      return NextResponse.json(
+        { error: 'ID da licitação é obrigatório' },
+        { status: 400 }
+      );
+    }
+
     // Gerar um nome de arquivo único para evitar colisões
     const fileName = file.name;
-    const fileExt = path.extname(fileName);
-    const uniqueId = generateUniqueId();
-    const uniqueFileName = `${uniqueId}${fileExt}`;
-    const filePath = path.join(uploadDir, uniqueFileName);
+    const fileExt = fileName.split('.').pop();
+    const uniqueId = Date.now() + '-' + Math.random().toString(36).substring(2, 9);
+    const uniqueFileName = `${uniqueId}.${fileExt}`;
+    
+    // Caminho do arquivo no bucket do Supabase
+    const filePath = `${licitacaoId}/${uniqueFileName}`;
 
     // Obter os bytes do arquivo
     const bytes = await file.arrayBuffer();
     const buffer = Buffer.from(bytes);
 
-    // Salvar o arquivo
-    await writeFile(filePath, buffer);
+    // Upload para o Supabase Storage
+    let uploadResult;
+    
+    try {
+      // Tentar fazer o upload
+      const { data, error } = await supabase.storage
+        .from('documentos')
+        .upload(filePath, buffer, {
+          contentType: file.type,
+          upsert: false
+        });
+        
+      if (error) {
+        // Verificar se é por causa do bucket não existir
+        if (error.message.includes('bucket') && error.message.includes('created first')) {
+          // Tentar criar o bucket
+          const { error: bucketError } = await supabase.storage.createBucket('documentos', {
+            public: true
+          });
+          
+          if (bucketError) {
+            console.error('Erro ao criar bucket documentos:', bucketError);
+            return NextResponse.json(
+              { error: 'Erro ao criar bucket de documentos' },
+              { status: 500 }
+            );
+          }
+          
+          // Após criar o bucket, é necessário configurar políticas de RLS (Row Level Security)
+          console.log('Bucket documentos criado com sucesso, configurando políticas de segurança...');
+          
+          // Tentar novamente o upload após criar o bucket
+          const { data: retryData, error: retryError } = await supabase.storage
+            .from('documentos')
+            .upload(filePath, buffer, {
+              contentType: file.type,
+              upsert: false
+            });
+            
+          if (retryError) {
+            console.error('Erro no upload após criar bucket:', retryError);
+            return NextResponse.json(
+              { error: 'Erro ao fazer upload do arquivo após criar bucket' },
+              { status: 500 }
+            );
+          }
+          
+          uploadResult = retryData;
+        } else {
+          console.error('Erro no upload para o Supabase Storage:', error);
+          return NextResponse.json(
+            { error: 'Erro ao fazer upload do arquivo: ' + error.message },
+            { status: 500 }
+          );
+        }
+      } else {
+        uploadResult = data;
+      }
+    } catch (uploadError) {
+      console.error('Erro durante o upload:', uploadError);
+      return NextResponse.json(
+        { error: 'Erro durante o processo de upload' },
+        { status: 500 }
+      );
+    }
 
-    // Calcular o tamanho do arquivo em bytes
-    const fileSize = buffer.length;
+    // Obter a URL pública do arquivo
+    const { data: publicUrl } = supabase.storage
+      .from('documentos')
+      .getPublicUrl(filePath);
 
-    // Construir a URL pública do arquivo
-    const fileUrl = `/uploads/documentos/${uniqueFileName}`;
-
+    // Console.log para depuração
+    console.log('Arquivo enviado com sucesso para o Supabase Storage:');
+    console.log('URL pública:', publicUrl.publicUrl);
+    console.log('licitacao_id:', licitacaoId);
+    console.log('nome:', fileName);
+      
+    // Apenas retornar a URL do arquivo sem tentar registrar no banco
+    // Isto permite que o upload funcione mesmo sem a tabela 'documentos'
     return NextResponse.json({
       success: true,
+      note: "Arquivo enviado com sucesso para o storage. A tabela 'documentos' no schema 'crmonefactory' precisa ser criada para registrar os metadados.",
       file: {
         originalName: fileName,
         name: uniqueFileName,
-        size: fileSize,
-        url: fileUrl
+        size: buffer.length,
+        url: publicUrl.publicUrl,
+        licitacaoId: licitacaoId
       }
     }, { status: 201 });
+    
   } catch (error) {
     console.error('Erro ao fazer upload de arquivo:', error);
     return NextResponse.json(

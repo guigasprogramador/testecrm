@@ -67,14 +67,23 @@ export function useClientes() {
         body: JSON.stringify(cliente),
       });
       
-      if (!response.ok) {
-        throw new Error('Erro ao criar cliente');
+      // Verificar o tipo de conteúdo da resposta
+      const contentType = response.headers.get('content-type');
+      if (!contentType || !contentType.includes('application/json')) {
+        throw new Error('Erro no servidor: Resposta inesperada');
       }
       
-      const novoCliente = await response.json();
-      setClientes((prev) => [...prev, novoCliente]);
+      // Obter o corpo da resposta para acessar mensagens de erro específicas
+      const data = await response.json();
       
-      return novoCliente;
+      if (!response.ok) {
+        // Capturar a mensagem de erro específica da API
+        throw new Error(data.error || 'Erro ao criar cliente');
+      }
+      
+      setClientes((prev) => [...prev, data]);
+      
+      return data;
     } catch (err) {
       console.error('Erro ao criar cliente:', err);
       throw err;
