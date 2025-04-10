@@ -343,5 +343,32 @@
     ],
     "tipo": "servico",
     "tipoFaturamento": ""
+  },
+  {
+    "id": "374790f3-6b2b-4d87-b99f-89f38941d12a",
+    "titulo": "Sistema de academia",
+    "cliente": "Max titanium",
+    "clienteId": "da51489f-1786-4146-a514-5a70fdc12771",
+    "valor": "R$ 150000",
+    "responsavel": "Ana Silva",
+    "responsavelId": "",
+    "prazo": "14/04/2025",
+    "status": "agendamento_reuniao",
+    "descricao": "dhdueuierucrijcvokvojrivhruhvrjv9rk-vkr-v0krvjirnvurvurvunr",
+    "dataCriacao": "2025-04-10T12:15:49.574Z",
+    "dataAtualizacao": "2025-04-10T12:15:49.575Z",
+    "cnpj": "50930978000125",
+    "contatoNome": "Muzi",
+    "contatoTelefone": "619874562120",
+    "contatoEmail": "muzi@gmail.com",
+    "endereco": "São Paulo Avenida Paulista",
+    "segmento": "prefeitura",
+    "dataReuniao": "14/04/2025",
+    "horaReuniao": "10:30",
+    "responsaveisIds": [
+      "resp1"
+    ],
+    "tipo": "servico",
+    "tipoFaturamento": ""
   }
 ]
